@@ -1,26 +1,26 @@
 # BYOK for Copilot Chat
 
-**Bring Your Own Key** — 在 VS Code Copilot Chat 中使用任意兼容的 LLM。
+**Bring Your Own Key** — Use any compatible LLM in VS Code Copilot Chat.
 
-支持 OpenAI 兼容协议和 Anthropic Messages 协议，包含 Tool Call（函数调用）、Thinking（推理）、Vision Proxy（视觉代理）等完整能力。
+Supports the OpenAI-compatible protocol and the Anthropic Messages protocol, with full Tool Call, Thinking/Reasoning, and Vision Proxy capabilities.
 
-> 本项目参考自 [deepseek-v4-for-copilot](https://github.com/Vizards/deepseek-v4-for-copilot)，在双协议支持、多端点管理等方面进行了扩展和重构。
+> This project is based on [deepseek-v4-for-copilot](https://github.com/Vizards/deepseek-v4-for-copilot), extended and refactored with dual-protocol support, multi-endpoint management, and more.
 
-## 特点
+## Features
 
-- 🔑 **BYOK** — 自带 API Key，使用你自己的模型和账户
-- 🔌 **双协议** — 同时支持 OpenAI 兼容接口和 Anthropic Messages 接口
-- 🛠️ **Tool Call** — 完整支持函数调用，包括流式增量解析
-- 🧠 **Thinking/Reasoning** — 支持推理模型的流式 thinking 输出
-- 👁️ **Vision Proxy** — 独立的视觉代理系统，为不支持多模态的模型提供图片理解能力
-- 📦 **多端点管理** — 通过侧边栏或设置配置多个 API 端点
-- 🔄 **Replay 标记** — 启用上下文缓存，节省请求成本
+- 🔑 **BYOK** — Bring your own API key and use your own model and account
+- 🔌 **Dual Protocol** — Supports both OpenAI-compatible and Anthropic Messages APIs
+- 🛠️ **Tool Call** — Full function calling support, including streaming delta parsing
+- 🧠 **Thinking/Reasoning** — Streaming thinking output for reasoning models
+- 👁️ **Vision Proxy** — Independent vision proxy system that provides image understanding for models without native multimodal support
+- 📦 **Multi-Endpoint Management** — Configure multiple API endpoints via sidebar or settings
+- 🔄 **Replay Markers** — Enable context caching to reduce request costs
 
-## 快速开始
+## Quick Start
 
-### 安装
+### Installation
 
-#### 本地打包安装
+#### Build from Source
 
 ```bash
 git clone https://github.com/pangdegui/byok-for-copilot.git
@@ -30,26 +30,26 @@ npm run compile
 npx vsce package --out dist/
 ```
 
-然后在 VS Code 中执行 **Extensions: Install from VSIX**，选择生成的 `dist/*.vsix` 文件。
+Then in VS Code, run **Extensions: Install from VSIX** and select the generated `dist/*.vsix` file.
 
 #### Marketplace
 
-暂未上架 VS Marketplace，请通过本地打包安装。
+Not yet published on the VS Marketplace. Please install locally from source.
 
-### 配置端点
+### Configure Endpoints
 
-#### 通过侧边栏（推荐）
+#### Via Sidebar (Recommended)
 
-1. 点击活动栏（Activity Bar）中的 **BYOK** 图标
-2. 点击 **Add Endpoint**（+）
-3. 填写：
-   - **名称** — 自定义标识（如 `my-provider`）
-   - **API URL** — API 基础地址
-   - **协议** — `openai-completions` 或 `anthropic-messages`
-   - **模型** — 逗号分隔的模型 ID 列表
-4. 点击端点条目，设置 **API Key**
+1. Click the **BYOK** icon in the Activity Bar
+2. Click **Add Endpoint** (+)
+3. Fill in:
+   - **Name** — a friendly identifier (e.g., `my-provider`)
+   - **API URL** — the base URL of your API provider
+   - **Protocol** — `openai-completions` or `anthropic-messages`
+   - **Models** — comma-separated model IDs
+4. Click the endpoint entry and set your **API Key**
 
-#### 通过设置
+#### Via Settings
 
 ```json
 "byok-copilot.endpoints": [
@@ -68,83 +68,83 @@ npx vsce package --out dist/
 ]
 ```
 
-### 选择模型
+### Select a Model
 
-1. 在 Copilot Chat 输入框打开模型选择器
-2. 找到 **BYOK** 分类下的模型（格式：`{modelId}@{endpointName}`）
-3. 选择模型开始对话
+1. Open the model picker in the Copilot Chat input box
+2. Find models under the **BYOK** category (format: `{modelId}@{endpointName}`)
+3. Select a model and start chatting
 
-> 💡 如果模型未显示，运行 `Developer: Manage Language Models` 检查 BYOK 模型是否被隐藏。
+> 💡 If models are hidden, run `Developer: Manage Language Models` to check whether BYOK models are visible.
 
-## 支持的协议
+## Supported Protocols
 
-### OpenAI 兼容协议 (`openai-completions`)
+### OpenAI-Compatible (`openai-completions`)
 
-支持所有提供 `/chat/completions` 接口的 API 提供商：
+Works with any API provider that offers the `/chat/completions` endpoint:
 
-- OpenAI（GPT-4o, GPT-4-turbo 等）
+- OpenAI (GPT-4o, GPT-4-turbo, etc.)
 - DeepSeek
-- 任意兼容的第三方代理或自部署服务
+- Any compatible third-party proxy or self-hosted service
 
-### Anthropic Messages 协议 (`anthropic-messages`)
+### Anthropic Messages (`anthropic-messages`)
 
-支持 Anthropic Messages API：
+Works with the Anthropic Messages API:
 
 - Claude 3.5 Sonnet / Haiku
 - Claude 3 Opus / Sonnet
 
-如果需要自定义 Anthropic API 版本，可在端点配置中设置 `anthropicVersion`。
+You can set a custom `anthropicVersion` in the endpoint configuration if needed.
 
-## 功能详情
+## Feature Details
 
-### Tool Call（函数调用）
+### Tool Call (Function Calling)
 
-两个协议均支持完整的函数调用流程：
+Both protocols support the full function calling flow:
 
-| 阶段 | OpenAI 协议 | Anthropic 协议 |
-|------|-------------|----------------|
-| 工具定义 | `tools[{function}]` | `tools[{input_schema}]` |
-| 调用请求 | `tool_calls[]` | `tool_use` content block |
-| 结果回传 | `role: tool` | `tool_result` content block |
-| 流式解析 | `tool_calls` delta 按 index 累积 | `input_json_delta` 按 index 累积 |
+| Phase | OpenAI Protocol | Anthropic Protocol |
+|-------|----------------|--------------------|
+| Tool Definition | `tools[{function}]` | `tools[{input_schema}]` |
+| Call Request | `tool_calls[]` | `tool_use` content block |
+| Result Return | `role: tool` | `tool_result` content block |
+| Stream Parsing | `tool_calls` delta accumulated by index | `input_json_delta` accumulated by index |
 
-单个请求最多支持 **128 个函数定义**。
+Up to **128 function definitions** are supported per request.
 
 ### Thinking / Reasoning
 
-支持推理模型的流式 thinking 输出。当模型能力标记 `thinking: true` 时，在请求中加入 `thinking` 参数。用户可在模型选择器中调整推理力度（`high` / `max` / `none`）。
+Streaming thinking output for reasoning models. When a model's capabilities include `thinking: true`, the `thinking` parameter is added to requests. Users can adjust reasoning effort (`high` / `max` / `none`) in the model picker.
 
-### Vision Proxy（视觉代理）
+### Vision Proxy
 
-视觉能力通过独立的代理系统实现，不要求主 LLM 本身支持多模态：
+Vision capability is provided through an independent proxy system, without requiring the primary LLM to support multimodal input:
 
-- 图片自动提取 → 发送到视觉代理 → 获取文本描述 → 注入主请求
-- 支持三种视觉代理协议：
-  - OpenAI Chat Completions（`image_url`）
-  - OpenAI Responses（`input_image`）
-  - Anthropic Messages（`image` base64）
-- 可配置回退到 VS Code 内置的语言模型进行图片描述
+- Images are automatically extracted → sent to a vision proxy → the resulting text description is injected into the main request
+- Supports three vision proxy protocols:
+  - OpenAI Chat Completions (`image_url`)
+  - OpenAI Responses (`input_image`)
+  - Anthropic Messages (`image` base64)
+- Can fall back to VS Code's built-in language model for image description
 
-视觉代理通过 `BYOK: Configure Vision Proxy` 命令配置。
+Configure the vision proxy via the `BYOK: Configure Vision Proxy` command.
 
-### 实验性功能
+### Experimental Features
 
-**Stabilize Tool List** — 通过预先激活工具减少工具列表变化对上下文缓存命中率的影响。在设置中开启 `byok-copilot.experimental.stabilizeToolList`。
+**Stabilize Tool List** — Pre-activates tools to reduce the impact of tool list changes on context cache hit rate. Enable via `byok-copilot.experimental.stabilizeToolList` in settings.
 
-### 多端点管理
+### Multi-Endpoint Management
 
-侧边栏支持完整的端点管理操作：
+The sidebar supports full endpoint management:
 
-- 添加/删除端点
-- 为每个端点独立设置 API Key
-- 编辑端点配置
-- 为端点添加/删除模型
-- 每个端点可独立指定认证方式（`bearer` / `x-api-key`）
-- 每个端点可独立指定协议和 API 版本
+- Add / delete endpoints
+- Set a separate API Key for each endpoint
+- Edit endpoint configuration
+- Add / remove models per endpoint
+- Independent authentication method per endpoint (`bearer` / `x-api-key`)
+- Independent protocol and API version per endpoint
 
-### 模型 ID 覆盖
+### Model ID Overrides
 
-如果 API 提供商使用不同的模型名称，可通过 `modelIdOverrides` 设置覆盖：
+If your API provider uses different model names, override them via the `modelIdOverrides` setting:
 
 ```json
 "byok-copilot.modelIdOverrides": {
@@ -153,70 +153,70 @@ npx vsce package --out dist/
 }
 ```
 
-## 设置项
+## Settings
 
-| 设置项 | 说明 |
-|--------|------|
-| `byok-copilot.endpoints` | API 端点配置列表 |
-| `byok-copilot.maxTokens` | 每次请求的最大输出 Token 数（0 表示不限制） |
-| `byok-copilot.modelIdOverrides` | 模型 ID 映射覆盖 |
-| `byok-copilot.visionModel` | 视觉代理配置 |
-| `byok-copilot.visionPrompt` | 视觉描述提示词 |
-| `byok-copilot.experimental.stabilizeToolList` | 启用工具列表预激活 |
-| `byok-copilot.debugMode` | 诊断日志级别（minimal / metadata / verbose） |
+| Setting | Description |
+|---------|-------------|
+| `byok-copilot.endpoints` | List of API endpoint configurations |
+| `byok-copilot.maxTokens` | Maximum output tokens per request (0 = no limit) |
+| `byok-copilot.modelIdOverrides` | Model ID mapping overrides |
+| `byok-copilot.visionModel` | Vision proxy configuration |
+| `byok-copilot.visionPrompt` | Vision description prompt |
+| `byok-copilot.experimental.stabilizeToolList` | Enable tool list pre-activation |
+| `byok-copilot.debugMode` | Diagnostic log level (`minimal` / `metadata` / `verbose`) |
 
-## 诊断与调试
+## Diagnostics & Debugging
 
-- `BYOK: Show Logs` — 查看诊断日志
-- `BYOK: Open Request Dumps Folder` — 打开完整请求 Dump 目录（需将 debugMode 设为 verbose）
-- `BYOK: Open Settings` — 打开扩展设置
+- `BYOK: Show Logs` — View diagnostic logs
+- `BYOK: Open Request Dumps Folder` — Open the request dump directory (requires `debugMode` set to `verbose`)
+- `BYOK: Open Settings` — Open extension settings
 
-## 开发
+## Development
 
-### 环境要求
+### Prerequisites
 
 - Node.js >= 24
 - VS Code >= 1.116.0
 
-### 构建
+### Build
 
 ```bash
 npm install
 npm run compile
 ```
 
-### 打包
+### Package
 
 ```bash
-npm run package
+npx vsce package --out dist/
 ```
 
-### 项目结构
+### Project Structure
 
 ```
 src/
-├── auth.ts               # API Key 管理（SecretStorage）
-├── config.ts             # 端点解析与运行时配置
-├── consts.ts             # 编译时常量、模型模板
-├── types.ts              # 共享类型定义
-├── client/               # API 客户端
-│   ├── core.ts           #   OpenAI SSE 流式客户端
-│   ├── openai/core.ts    #   OpenAI 独立客户端
-│   └── anthropic/core.ts #   Anthropic 事件流客户端
-├── provider/             # LanguageModelChatProvider 实现
-│   ├── index.ts          #   Provider 入口
-│   ├── request.ts        #   请求构建（双协议）
-│   ├── stream.ts         #   流式响应处理
-│   ├── convert.ts        #   消息/工具格式转换
-│   ├── tools/            #   工具调用编排
-│   │   ├── flow.ts       #     工具流编排
-│   │   ├── request.ts    #     工具请求准备
-│   │   ├── preflight.ts  #     工具预检激活
-│   │   └── notices.ts    #     工具通知
-│   └── vision/           #   视觉代理系统
-└── runtime/              # 扩展生命周期
+├── auth.ts               # API Key management (SecretStorage)
+├── config.ts             # Endpoint resolution & runtime config
+├── consts.ts             # Compile-time constants, model templates
+├── types.ts              # Shared type definitions
+├── client/               # API clients
+│   ├── core.ts           #   OpenAI SSE streaming client
+│   ├── openai/core.ts    #   OpenAI standalone client
+│   └── anthropic/core.ts #   Anthropic event-stream client
+├── provider/             # LanguageModelChatProvider implementation
+│   ├── index.ts          #   Provider entry point
+│   ├── request.ts        #   Request builder (dual protocol)
+│   ├── stream.ts         #   Streaming response handling
+│   ├── convert.ts        #   Message/tool format conversion
+│   ├── tools/            #   Tool calling orchestration
+│   │   ├── flow.ts       #     Tool flow orchestration
+│   │   ├── request.ts    #     Tool request preparation
+│   │   ├── preflight.ts  #     Tool preflight activation
+│   │   └── notices.ts    #     Tool notices
+│   └── vision/           #   Vision proxy system
+└── runtime/              # Extension lifecycle
 ```
 
-## 许可
+## License
 
-MIT License — 详见 [LICENSE](./LICENSE)。
+MIT License — see [LICENSE](./LICENSE).
