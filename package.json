@@ -1,0 +1,383 @@
+{
+  "name": "byok-for-copilot-chat",
+  "displayName": "BYOK for Copilot Chat",
+  "description": "Bring your own key — use any OpenAI-compatible LLM in Copilot Chat. Vision proxy, thinking mode, agent tools.",
+  "icon": "resources/icon.png",
+  "version": "0.6.2",
+  "publisher": "open-tools",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/open-tools/byok-for-copilot-chat"
+  },
+  "engines": {
+    "vscode": "^1.116.0",
+    "node": ">=24"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "byok",
+    "llm",
+    "bring-your-own-key",
+    "copilot",
+    "github copilot",
+    "copilot chat",
+    "vision",
+    "byok",
+    "language model",
+    "thinking",
+    "reasoning",
+    "ai",
+    "chat"
+  ],
+  "activationEvents": [
+    "onUri",
+    "onStartupFinished",
+    "onView:byok-copilot.endpointsSidebar"
+  ],
+  "enabledApiProposals": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languageModelChatProviders": [
+      {
+        "vendor": "byok",
+        "displayName": "BYOK"
+      }
+    ],
+    "commands": [
+      {
+        "command": "byok-copilot.setApiKey",
+        "title": "%byok-copilot.command.setApiKey%"
+      },
+      {
+        "command": "byok-copilot.getApiKey",
+        "title": "%byok-copilot.command.getApiKey%"
+      },
+      {
+        "command": "byok-copilot.clearApiKey",
+        "title": "%byok-copilot.command.clearApiKey%"
+      },
+      {
+        "command": "byok-copilot.setVisionModel",
+        "title": "%byok-copilot.command.setVisionModel%"
+      },
+      {
+        "command": "byok-copilot.openSettings",
+        "title": "%byok-copilot.command.openSettings%"
+      },
+      {
+        "command": "byok-copilot.showLogs",
+        "title": "%byok-copilot.command.showLogs%"
+      },
+      {
+        "command": "byok-copilot.openRequestDumpsFolder",
+        "title": "%byok-copilot.command.openRequestDumpsFolder%"
+      },
+      {
+        "command": "byok-copilot.addEndpoint",
+        "title": "%byok-copilot.command.addEndpoint%"
+      },
+      {
+        "command": "byok-copilot.refreshEndpoints",
+        "title": "%byok-copilot.command.refreshEndpoints%"
+      },
+      {
+        "command": "byok-copilot.setEndpointApiKey",
+        "title": "%byok-copilot.command.setEndpointApiKey%",
+        "icon": "$(key)"
+      },
+      {
+        "command": "byok-copilot.editEndpoint",
+        "title": "%byok-copilot.command.editEndpoint%",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "byok-copilot.clearEndpointApiKeyFromSidebar",
+        "title": "%byok-copilot.command.clearEndpointApiKeyFromSidebar%",
+        "icon": "$(close)"
+      },
+      {
+        "command": "byok-copilot.deleteEndpoint",
+        "title": "%byok-copilot.command.deleteEndpoint%",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "byok-copilot.addModelToEndpoint",
+        "title": "%byok-copilot.command.addModelToEndpoint%",
+        "icon": "$(add)"
+      },
+      {
+        "command": "byok-copilot.deleteModelFromEndpoint",
+        "title": "%byok-copilot.command.deleteModelFromEndpoint%",
+        "icon": "$(trash)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "byok-copilot",
+          "title": "BYOK",
+          "icon": "resources/activitybar.png"
+        }
+      ]
+    },
+    "views": {
+      "byok-copilot": [
+        {
+          "id": "byok-copilot.endpointsSidebar",
+          "name": "%byok-copilot.views.endpointsSidebar.name%"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "byok-copilot.addEndpoint",
+          "when": "view == byok-copilot.endpointsSidebar",
+          "group": "navigation"
+        },
+        {
+          "command": "byok-copilot.refreshEndpoints",
+          "when": "view == byok-copilot.endpointsSidebar",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "byok-copilot.setEndpointApiKey",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem == endpointKeyUnset",
+          "group": "inline@1"
+        },
+        {
+          "command": "byok-copilot.editEndpoint",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem =~ /^(endpointKeyUnset|endpointKeySet)$/",
+          "group": "inline@2"
+        },
+        {
+          "command": "byok-copilot.clearEndpointApiKeyFromSidebar",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem == endpointKeySet",
+          "group": "inline@3"
+        },
+        {
+          "command": "byok-copilot.deleteEndpoint",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem =~ /^(endpointKeyUnset|endpointKeySet)$/",
+          "group": "inline@4"
+        },
+        {
+          "command": "byok-copilot.setEndpointApiKey",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem == endpointKeyItemUnset",
+          "group": "inline@1"
+        },
+        {
+          "command": "byok-copilot.clearEndpointApiKeyFromSidebar",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem == endpointKeyItemSet",
+          "group": "inline@1"
+        },
+        {
+          "command": "byok-copilot.addModelToEndpoint",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem == modelsHeader",
+          "group": "inline@1"
+        },
+        {
+          "command": "byok-copilot.deleteModelFromEndpoint",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem == modelItem",
+          "group": "inline@1"
+        },
+        {
+          "command": "byok-copilot.editEndpoint",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem =~ /^(endpointKeyUnset|endpointKeySet)$/",
+          "group": "z_edit"
+        },
+        {
+          "command": "byok-copilot.deleteEndpoint",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem =~ /^(endpointKeyUnset|endpointKeySet)$/",
+          "group": "z_delete"
+        }
+      ]
+    },
+    "walkthroughs": [
+      {
+        "id": "byokGettingStarted",
+        "title": "%byok-copilot.walkthrough.title%",
+        "description": "%byok-copilot.walkthrough.description%",
+        "steps": [
+          {
+            "id": "setApiKey",
+            "title": "%byok-copilot.walkthrough.setApiKey.title%",
+            "description": "%byok-copilot.walkthrough.setApiKey.description%",
+            "media": {
+              "markdown": "resources/walkthrough/set-api-key.md"
+            },
+            "completionEvents": [
+              "onCommand:byok-copilot.setApiKey"
+            ]
+          },
+          {
+            "id": "showModels",
+            "title": "%byok-copilot.walkthrough.showModels.title%",
+            "description": "%byok-copilot.walkthrough.showModels.description%",
+            "media": {
+              "markdown": "resources/walkthrough/show-models.md"
+            }
+          },
+          {
+            "id": "advancedSettings",
+            "title": "%byok-copilot.walkthrough.advancedSettings.title%",
+            "description": "%byok-copilot.walkthrough.advancedSettings.description%",
+            "media": {
+              "markdown": "resources/walkthrough/advanced-settings.md"
+            }
+          }
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "%byok-copilot.config.title%",
+      "properties": {
+        "byok-copilot.endpoints": {
+          "type": "array",
+          "default": [],
+          "description": "%byok-copilot.config.endpoints.description%",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "%byok-copilot.config.endpoints.name.description%"
+              },
+              "baseUrl": {
+                "type": "string",
+                "description": "%byok-copilot.config.endpoints.baseUrl.description%"
+              },
+              "models": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    { "type": "string" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string" },
+                        "displayName": { "type": "string" },
+                        "baseUrl": { "type": "string" },
+                        "authType": { "type": "string" },
+                        "protocol": { "type": "string" },
+                        "anthropicVersion": { "type": "string" },
+                        "family": { "type": "string" },
+                        "version": { "type": "string" },
+                        "maxInputTokens": { "type": "number" },
+                        "maxOutputTokens": { "type": "number" }
+                      },
+                      "required": ["id"]
+                    }
+                  ]
+                },
+                "description": "%byok-copilot.config.endpoints.models.description%"
+              },
+              "protocol": {
+                "type": "string",
+                "enum": ["openai-completions", "anthropic-messages"],
+                "description": "%byok-copilot.config.endpoints.protocol.description%"
+              },
+              "anthropicVersion": {
+                "type": "string",
+                "description": "%byok-copilot.config.endpoints.anthropicVersion.description%"
+              }
+            },
+            "required": ["name", "baseUrl", "models"]
+          }
+        },
+        "byok-copilot.maxTokens": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "%byok-copilot.config.maxTokens.description%"
+        },
+        "byok-copilot.experimental.stabilizeToolList": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%byok-copilot.config.experimental.stabilizeToolList.description%",
+          "tags": [
+            "experimental"
+          ]
+        },
+        "byok-copilot.modelIdOverrides": {
+          "type": "object",
+          "default": {
+          },
+          "description": "%byok-copilot.config.modelIdOverrides.description%",
+          "additionalProperties": false,
+          "properties": {
+            "byok-v4-flash": {
+              "type": "string",
+              "description": "%byok-copilot.config.modelIdOverrides.byok-v4-flash.description%"
+            },
+            "byok-v4-pro": {
+              "type": "string",
+              "description": "%byok-copilot.config.modelIdOverrides.byok-v4-pro.description%"
+            }
+          }
+        },
+        "byok-copilot.visionModel": {
+          "type": "string",
+          "default": "",
+          "tags": [
+            "advanced"
+          ],
+          "markdownDescription": "%byok-copilot.config.visionModel.description%"
+        },
+        "byok-copilot.visionPrompt": {
+          "type": "string",
+          "editPresentation": "multilineText",
+          "default": "Describe all image attachments in this message.\n\nIf there is one image, describe it directly.\nIf there are multiple images:\n1. Describe each image separately, preserving their order.\n2. Then provide a combined description explaining the overall context and relationships across the images.\n\nReturn one concise factual description suitable for inserting into a text-only chat prompt. Include visible text, objects, UI elements, people, and relevant context. Do not invent details.",
+          "markdownDescription": "%byok-copilot.config.visionPrompt.description%"
+        },
+        "byok-copilot.debugMode": {
+          "type": "string",
+          "default": "minimal",
+          "enum": [
+            "minimal",
+            "metadata",
+            "verbose"
+          ],
+          "enumItemLabels": [
+            "%byok-copilot.config.debugMode.minimal.label%",
+            "%byok-copilot.config.debugMode.metadata.label%",
+            "%byok-copilot.config.debugMode.verbose.label%"
+          ],
+          "markdownEnumDescriptions": [
+            "%byok-copilot.config.debugMode.minimal.description%",
+            "%byok-copilot.config.debugMode.metadata.description%",
+            "%byok-copilot.config.debugMode.verbose.description%"
+          ],
+          "markdownDescription": "%byok-copilot.config.debugMode.description%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('out', { recursive: true, force: true, maxRetries: process.platform === 'win32' ? 10 : 0 })\"",
+    "vscode:prepublish": "npm run compile",
+    "compile": "npm run clean && tsc -p ./",
+    "watch": "npm run clean && tsc -watch -p ./",
+    "lint": "oxlint",
+    "format": "oxfmt --write src/",
+    "format:check": "oxfmt --check src/",
+    "package": "vsce package --readme-path dist/README.marketplace.md -o dist/",
+    "login": "vsce login open-tools"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/vscode": "^1.116.0",
+    "@vscode/vsce": "^3.9.1",
+    "ovsx": "0.10.12",
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
+    "typescript": "^6.0.3"
+  }
+}
+
