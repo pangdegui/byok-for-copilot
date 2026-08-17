@@ -102,7 +102,7 @@ You can set a custom `anthropicVersion` in the endpoint configuration if needed.
 
 BYOK never uploads anything to Microsoft. All API requests go **only** to the endpoints you configure, and all usage statistics are stored locally in VS Code's global state.
 
-Per-request token usage is recorded locally for the built-in statistics and token-count calibration. By default BYOK does **not** send usage data to the local Copilot Chat UI (used to display token counts in the chat). If you want the token counts shown in the Copilot Chat interface, enable `byok-copilot.privacy.reportUsageToChat`.
+Per-request token usage is recorded locally for the built-in statistics and token-count calibration. By default BYOK also sends the usage data to the local Copilot Chat UI so token counts appear in the chat. To keep usage data entirely local (hiding the token counts from the chat UI), disable `byok-copilot.privacy.reportUsageToChat`.
 
 ### Tool Call (Function Calling)
 
@@ -182,7 +182,7 @@ If your API provider uses different model names, override them via the `modelIdO
 | `byok-copilot.visionPrompt` | Vision description prompt |
 | `byok-copilot.experimental.stabilizeToolList` | Enable tool list pre-activation |
 | `byok-copilot.debugMode` | Diagnostic log level (`minimal` / `metadata` / `verbose`) |
-| `byok-copilot.privacy.reportUsageToChat` | Report per-request token usage to the local Copilot Chat UI (default `false`) |
+| `byok-copilot.privacy.reportUsageToChat` | Report per-request token usage to the local Copilot Chat UI (default `true`) |
 
 ## Diagnostics & Debugging
 

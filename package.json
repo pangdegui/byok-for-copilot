@@ -388,7 +388,7 @@
         },
         "byok-copilot.privacy.reportUsageToChat": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "markdownDescription": "%byok-copilot.config.privacy.reportUsageToChat.description%",
           "tags": [
             "privacy"

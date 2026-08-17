@@ -47,5 +47,5 @@
   "byok-copilot.config.endpoints.models.description": "List of model IDs or model configuration objects served by this endpoint.",
   "byok-copilot.config.endpoints.protocol.description": "API protocol. 'openai-completions' for OpenAI-compatible, 'anthropic-messages' for Anthropic-compatible.",
   "byok-copilot.config.endpoints.anthropicVersion.description": "Anthropic API version header value (e.g. '2023-06-01'). Only used when protocol is 'anthropic-messages'.",
-  "byok-copilot.config.privacy.reportUsageToChat.description": "**Privacy**: whether to send per-request token usage to the local Copilot Chat UI (process-internal, used to display token counts in the chat). **Default is off** \u2014 BYOK never uploads usage data to Microsoft; usage is always recorded locally for the built-in statistics. Enable only if you want the token counts shown in the Copilot Chat interface."
+  "byok-copilot.config.privacy.reportUsageToChat.description": "Whether to send per-request token usage to the local Copilot Chat UI (process-internal, used to display token counts in the chat). **Default is on**. BYOK never uploads usage data to Microsoft — usage is always recorded locally for the built-in statistics. Turn this off to keep usage data entirely local (token counts will no longer appear in the chat UI)."
 }

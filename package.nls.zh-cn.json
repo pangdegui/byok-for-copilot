@@ -47,5 +47,5 @@
   "byok-copilot.config.endpoints.models.description": "此端点可用的模型 ID 或模型配置对象列表。",
   "byok-copilot.config.endpoints.protocol.description": "API 协议。'openai-completions' 适用于 OpenAI 兼容协议，'anthropic-messages' 适用于 Anthropic 兼容协议。",
   "byok-copilot.config.endpoints.anthropicVersion.description": "Anthropic API 版本头信息（例如 '2023-06-01'）。仅当协议为 'anthropic-messages' 时使用。",
-  "byok-copilot.config.privacy.reportUsageToChat.description": "**隐私**：是否把每次请求的 token 用量发送给本地 Copilot Chat 界面（进程内通信，用于在聊天中显示 token 数）。**默认关闭** \u2014 BYOK 不会向微软上传用量数据；用量始终在本地记录，用于内置统计。仅当你想在 Copilot Chat 界面中看到 token 数时再开启。"
+  "byok-copilot.config.privacy.reportUsageToChat.description": "是否把每次请求的 token 用量发送给本地 Copilot Chat 界面（进程内通信，用于在聊天中显示 token 数）。**默认开启**。BYOK 不会向微软上传用量数据——用量始终在本地记录，用于内置统计。关闭后用量数据将完全保存在本地（聊天界面不再显示 token 数）。"
 }
