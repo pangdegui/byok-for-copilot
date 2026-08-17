@@ -98,6 +98,12 @@ npx vsce package --out dist/
 
 ## 功能详情
 
+### 隐私说明
+
+BYOK 不会向微软上传任何数据。所有 API 请求**只**发往你自己配置的端点，所有用量统计仅保存在 VS Code 本地全局状态中。
+
+每次请求的 token 用量会在本地记录，用于内置统计与 token 计数校准。默认情况下 BYOK **不会**把用量数据发送给本地 Copilot Chat 界面（该机制用于在聊天中显示 token 数）。如果你想在 Copilot Chat 界面中看到 token 数，请开启 `byok-copilot.privacy.reportUsageToChat`。
+
 ### Tool Call（函数调用）
 
 两个协议均支持完整的函数调用流程：
@@ -176,6 +182,7 @@ BYOK 活动栏中的**用量统计**视图按模型显示简略汇总。点击**
 | `byok-copilot.visionPrompt` | 视觉描述提示词 |
 | `byok-copilot.experimental.stabilizeToolList` | 启用工具列表预激活 |
 | `byok-copilot.debugMode` | 诊断日志级别（minimal / metadata / verbose） |
+| `byok-copilot.privacy.reportUsageToChat` | 是否把每次请求的 token 用量发送给本地 Copilot Chat 界面（默认关闭） |
 
 ## 诊断与调试
 

@@ -1,6 +1,7 @@
 import vscode from 'vscode';
 import type { CancellationToken } from 'vscode';
 import { createUserFacingError } from '../client';
+import { getReportUsageToChatEnabled } from '../config';
 import type { StreamCallbacks } from '../types';
 import { logger } from '../logger';
 import type { BYOKToolCall, BYOKUsage } from '../types';
@@ -106,7 +107,9 @@ export function streamChatCompletion({
 					setCharsPerToken(charsPerToken);
 					prepared.cacheDiagnostics.onUsage(usage, charsPerToken);
 					recordUsageEvent(prepared.vscodeModelId, prepared.apiModelId, usage, charsPerToken);
-					reportCopilotContextUsage(progress, usage, prepared.requestKind);
+					if (getReportUsageToChatEnabled()) {
+						reportCopilotContextUsage(progress, usage, prepared.requestKind);
+					}
 				},
 			},
 			token,

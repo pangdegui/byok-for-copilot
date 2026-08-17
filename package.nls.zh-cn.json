@@ -29,7 +29,7 @@
   "byok-copilot.config.title": "BYOK 助手",
   "byok-copilot.config.maxTokens.description": "每次请求的最大输出 Token 数，设为 0 则不限制，可用于控制成本。",
   "byok-copilot.config.experimental.stabilizeToolList.description": "**实验性功能**：通过预先激活可用的工具来提升上下文缓存命中率。\n- 当已启用工具列表跨轮次变化时，这可能提高上下文缓存命中率；\n- 请求中将包含更多函数工具定义，input tokens 可能增加，虽然缓存命中的 input tokens 单价更低，但仍会计入用量；\n- 此设置可能会在当前 Copilot 对话历史中加入内部预检工具调用。在同一对话中切换到其他模型时，部分模型提供方可能无法正确重放这段历史；如果切换模型后请求异常，请新建对话后重试。\n\n 通过 [配置工具](command:workbench.action.chat.configureTools) **查看和管理**工具列表：\n\n- 64 个或更少已启用工具时通常无需开启，除非工具列表仍在跨轮次变化；\n- 超过 128 个已启用工具时不建议开启：多数 API 单次请求最多支持 128 个 functions。考虑禁用部分不常用工具。",
-  "byok-copilot.config.debugMode.description": "控制 BYOK Copilot 写入的诊断信息量。无论此设置如何，token 用量始终上报给 Copilot。\n\n- **基本** \u2014 仅上报 token 用量，不输出诊断日志或请求 dump。\n- **元数据** \u2014 隐私安全的诊断元数据（请求哈希、前缀重合度、工具定义变更）。不含提示词原文，可安全附在公开 issue 中反馈问题。使用 [`BYOK: 显示日志`](command:byok-copilot.showLogs) 查看。\n- **详细** \u2014 将完整请求体写入磁盘，供本地调试。**警告：包含敏感的提示词内容。** 使用 [`BYOK: 打开请求 Dump 目录`](command:byok-copilot.openRequestDumpsFolder) 浏览。",
+  "byok-copilot.config.debugMode.description": "控制 BYOK 写入自身日志的诊断信息量。无论此设置如何，token 用量始终在本地记录（用于内置统计与 token 计数校准）。\n\n- **基本** \u2014 仅记录 token 用量，不输出诊断日志或请求 dump。\n- **元数据** \u2014 隐私安全的诊断元数据（请求哈希、前缀重合度、工具定义变更）。不含提示词原文，可安全附在公开 issue 中反馈问题。使用 [`BYOK: 显示日志`](command:byok-copilot.showLogs) 查看。\n- **详细** \u2014 将完整请求体写入磁盘，供本地调试。**警告：包含敏感的提示词内容。** 使用 [`BYOK: 打开请求 Dump 目录`](command:byok-copilot.openRequestDumpsFolder) 浏览。\n\n**隐私说明**：BYOK 不会向微软上传任何数据。所有 API 请求只发往你自己配置的端点，用量统计仅保存在本地。",
   "byok-copilot.config.debugMode.minimal.label": "基本",
   "byok-copilot.config.debugMode.minimal.description": "仅上报 token 用量，不输出诊断日志或 dump。",
   "byok-copilot.config.debugMode.metadata.label": "元数据",
@@ -46,5 +46,6 @@
   "byok-copilot.config.endpoints.baseUrl.description": "API 基础 URL（例如 https://api.openai.com）。",
   "byok-copilot.config.endpoints.models.description": "此端点可用的模型 ID 或模型配置对象列表。",
   "byok-copilot.config.endpoints.protocol.description": "API 协议。'openai-completions' 适用于 OpenAI 兼容协议，'anthropic-messages' 适用于 Anthropic 兼容协议。",
-  "byok-copilot.config.endpoints.anthropicVersion.description": "Anthropic API 版本头信息（例如 '2023-06-01'）。仅当协议为 'anthropic-messages' 时使用。"
+  "byok-copilot.config.endpoints.anthropicVersion.description": "Anthropic API 版本头信息（例如 '2023-06-01'）。仅当协议为 'anthropic-messages' 时使用。",
+  "byok-copilot.config.privacy.reportUsageToChat.description": "**隐私**：是否把每次请求的 token 用量发送给本地 Copilot Chat 界面（进程内通信，用于在聊天中显示 token 数）。**默认关闭** \u2014 BYOK 不会向微软上传用量数据；用量始终在本地记录，用于内置统计。仅当你想在 Copilot Chat 界面中看到 token 数时再开启。"
 }

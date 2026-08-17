@@ -385,6 +385,14 @@
             "%byok-copilot.config.debugMode.verbose.description%"
           ],
           "markdownDescription": "%byok-copilot.config.debugMode.description%"
+        },
+        "byok-copilot.privacy.reportUsageToChat": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "%byok-copilot.config.privacy.reportUsageToChat.description%",
+          "tags": [
+            "privacy"
+          ]
         }
       }
     }

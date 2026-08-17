@@ -61,6 +61,19 @@ export function getStabilizeToolListEnabled(): boolean {
 }
 
 /**
+ * Whether to report per-request token usage to the local Copilot Chat UI
+ * (process-internal `LanguageModelDataPart`, used to display token counts).
+ *
+ * Defaults to `false` (privacy-first): usage is still recorded locally for
+ * the built-in statistics and token-count calibration, but no usage data is
+ * handed to the VS Code Copilot Chat process.
+ */
+export function getReportUsageToChatEnabled(): boolean {
+	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	return config.get<boolean>('privacy.reportUsageToChat', false);
+}
+
+/**
  * Migrate the legacy boolean `byok-copilot.debug` setting to `debugMode`.
  *
  * `debug: true` maps to `debugMode: metadata`; `debug: false` maps to the
