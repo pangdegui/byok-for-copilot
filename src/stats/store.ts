@@ -167,6 +167,153 @@ export class UsageStatsStore {
 			cacheMissTokens,
 		};
 	}
+
+	/**
+	 * Import parsed aggregates into the store.
+	 *
+	 * @param aggregates map of modelId → aggregate
+	 * @param mode 'merge' adds to existing aggregates, 'replace' overwrites all
+	 * @returns number of models imported
+	 */
+	importStats(
+		aggregates: Record<string, ModelAggregate>,
+		mode: 'merge' | 'replace',
+	): number {
+		const current = mode === 'replace' ? {} : this.getAll();
+		const merged = { ...current };
+
+		for (const [modelId, agg] of Object.entries(aggregates)) {
+			const existing = merged[modelId];
+			merged[modelId] = existing ? mergeAggregates(existing, agg) : agg;
+		}
+
+		void this.memento.update(STORAGE_KEY, merged);
+		return Object.keys(aggregates).length;
+	}
+}
+
+/** Combine two aggregates by summing counters. */
+function mergeAggregates(a: ModelAggregate, b: ModelAggregate): ModelAggregate {
+	return {
+		apiModelId: b.apiModelId || a.apiModelId,
+		requests: a.requests + b.requests,
+		promptTokens: a.promptTokens + b.promptTokens,
+		completionTokens: a.completionTokens + b.completionTokens,
+		totalTokens: a.totalTokens + b.totalTokens,
+		cacheHitTokens: a.cacheHitTokens + b.cacheHitTokens,
+		cacheMissTokens: a.cacheMissTokens + b.cacheMissTokens,
+		charsPerTokenSum: a.charsPerTokenSum + b.charsPerTokenSum,
+		firstSeen: Math.min(a.firstSeen, b.firstSeen),
+		lastUpdated: Math.max(a.lastUpdated, b.lastUpdated),
+	};
+}
+
+export interface ParseStatsImportResult {
+	aggregates: Record<string, ModelAggregate>;
+	error?: string;
+}
+
+function toFiniteCount(value: unknown): number {
+	return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+function parseTimestamp(value: unknown, fallback: number): number {
+	return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * Parse imported statistics JSON. Accepts two formats (both use the same
+ * field names as the export):
+ *
+ *  1. StatsSnapshot (the export format):
+ *     { models: [{ modelId, apiModelId, requests, promptTokens, ... }, ...] }
+ *  2. Raw aggregate map:
+ *     { "<modelId>": { apiModelId, requests, promptTokens, ... } }
+ *
+ * Invalid entries are skipped; the parsed result never contains NaN/Infinity.
+ */
+export function parseStatsImportJson(text: string): ParseStatsImportResult {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch {
+		return { aggregates: {}, error: '不是有效的 JSON 数据' };
+	}
+
+	const aggregates: Record<string, ModelAggregate> = {};
+
+	if (Array.isArray((parsed as { models?: unknown } | null)?.models)) {
+		// StatsSnapshot format.
+		for (const item of (parsed as { models: unknown[] }).models) {
+			if (!item || typeof item !== 'object') {
+				continue;
+			}
+			const record = item as Record<string, unknown>;
+			const modelId = typeof record.modelId === 'string' ? record.modelId : '';
+			if (!modelId) {
+				continue;
+			}
+			const now = Date.now();
+			const aggregate = toAggregateFromStats(record, modelId, now);
+			if (aggregate) {
+				aggregates[modelId] = aggregate;
+			}
+		}
+	} else if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+		// Raw aggregate map format.
+		for (const [modelId, value] of Object.entries(parsed as Record<string, unknown>)) {
+			if (!value || typeof value !== 'object') {
+				continue;
+			}
+			const aggregate = toAggregateFromStats(
+				value as Record<string, unknown>,
+				modelId,
+				Date.now(),
+			);
+			if (aggregate) {
+				aggregates[modelId] = aggregate;
+			}
+		}
+	}
+
+	return { aggregates };
+}
+
+function toAggregateFromStats(
+	record: Record<string, unknown>,
+	modelId: string,
+	now: number,
+): ModelAggregate | undefined {
+	// A row is meaningful only if it reports at least one request with usable counts.
+	const requests = toFiniteCount(record.requests);
+	const promptTokens = toFiniteCount(record.promptTokens);
+	const completionTokens = toFiniteCount(record.completionTokens);
+	const totalTokens = toFiniteCount(record.totalTokens);
+	const cacheHitTokens = toFiniteCount(record.cacheHitTokens);
+	const cacheMissTokens = toFiniteCount(record.cacheMissTokens);
+
+	if (requests <= 0) {
+		return undefined;
+	}
+
+	// avgCharsPerToken is the exported average; charsPerTokenSum = avg * requests.
+	const avgChars = toFiniteCount(record.avgCharsPerToken);
+
+	return {
+		apiModelId:
+			typeof record.apiModelId === 'string' && record.apiModelId
+				? record.apiModelId
+				: modelId,
+		requests,
+		promptTokens,
+		completionTokens,
+		totalTokens,
+		cacheHitTokens,
+		cacheMissTokens,
+		charsPerTokenSum: avgChars * requests,
+		firstSeen: parseTimestamp(record.firstSeen, now),
+		lastUpdated: parseTimestamp(record.lastUpdated, now),
+	};
 }
 
 export function createEmptyAggregate(modelId: string, apiModelId: string): ModelAggregate {

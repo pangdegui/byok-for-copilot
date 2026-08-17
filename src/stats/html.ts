@@ -207,6 +207,7 @@ export function getStatsPanelHtml(
 		<div class="toolbar">
 			<button id="refresh" title="重新读取统计">⟳ 刷新</button>
 			<button id="export" title="复制 JSON 到剪贴板">⧉ 导出</button>
+			<button id="import" title="从剪贴板导入 JSON（与导出同格式）">⤓ 导入</button>
 			<button id="resetAll" class="danger" title="清空所有模型的统计">🗑 重置全部</button>
 			<div class="spacer"></div>
 			<button id="showLogs" title="打开 BYOK 输出日志">📜 日志</button>
@@ -382,6 +383,9 @@ export function getStatsPanelHtml(
 		});
 		document.getElementById('export').addEventListener('click', () => {
 			vscode.postMessage({ type: 'export' });
+		});
+		document.getElementById('import').addEventListener('click', () => {
+			vscode.postMessage({ type: 'import' });
 		});
 		document.getElementById('resetAll').addEventListener('click', () => {
 			vscode.postMessage({ type: 'resetAll' });

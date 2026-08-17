@@ -1,6 +1,7 @@
 import vscode from 'vscode';
 import { getDebugMode, getEndpoints } from '../config';
 import { getStatsPanelHtml, type StatsPanelState } from './html';
+import { parseStatsImportJson } from './store';
 import type { UsageTracker } from './tracker';
 
 let currentPanel: vscode.WebviewPanel | undefined;
@@ -78,6 +79,47 @@ async function handleMessage(
 			const state = getPanelState(tracker);
 			await vscode.env.clipboard.writeText(JSON.stringify(state.snapshot, null, 2));
 			void vscode.window.showInformationMessage('用量统计 JSON 已复制到剪贴板');
+			return;
+		}
+
+		case 'import': {
+			const text = await vscode.env.clipboard.readText();
+			if (!text.trim()) {
+				void vscode.window.showWarningMessage('剪贴板为空，请先复制导出的统计 JSON');
+				return;
+			}
+			const { aggregates, error } = parseStatsImportJson(text);
+			const count = Object.keys(aggregates).length;
+			if (count === 0) {
+				void vscode.window.showErrorMessage(
+					error ?? '未能从剪贴板解析出有效的统计数据（请使用导出格式）',
+				);
+				return;
+			}
+			const selected = await vscode.window.showQuickPick(
+				[
+					{
+						label: '合并到现有统计',
+						description: '将导入的数据与当前数据相加',
+						detail: `共 ${count} 个模型`,
+					},
+					{
+						label: '替换现有统计',
+						description: '清空当前数据后导入',
+						detail: `共 ${count} 个模型`,
+					},
+				],
+				{ placeHolder: '选择导入方式' },
+			);
+			if (!selected) {
+				return;
+			}
+			const mode = selected.label.startsWith('替换') ? 'replace' : 'merge';
+			const imported = tracker.importStats(aggregates, mode);
+			await postState(panel, tracker);
+			void vscode.window.showInformationMessage(
+				`已${mode === 'merge' ? '合并导入' : '导入并替换'} ${imported} 个模型的统计`,
+			);
 			return;
 		}
 

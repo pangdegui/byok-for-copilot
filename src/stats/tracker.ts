@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import type { BYOKUsage } from '../types';
 import { normalizeUsage } from './usage';
-import { UsageStatsStore, type StatsSnapshot } from './store';
+import { UsageStatsStore, type ModelAggregate, type StatsSnapshot } from './store';
 
 /**
  * Global usage tracker — the single sink for every per-request usage event.
@@ -49,6 +49,23 @@ export class UsageTracker {
 	resetAll(): void {
 		this.store.resetAll();
 		this._onDidChange.fire();
+	}
+
+	/**
+	 * Import parsed aggregates into the store.
+	 *
+	 * @param mode 'merge' adds to existing data, 'replace' overwrites everything
+	 * @returns number of models imported
+	 */
+	importStats(
+		aggregates: Record<string, ModelAggregate>,
+		mode: 'merge' | 'replace',
+	): number {
+		const count = this.store.importStats(aggregates, mode);
+		if (count > 0) {
+			this._onDidChange.fire();
+		}
+		return count;
 	}
 }
 
