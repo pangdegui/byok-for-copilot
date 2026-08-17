@@ -4,6 +4,7 @@ import { getDebugLoggingEnabled } from '../../config';
 import { LANGUAGE_MODEL_CHAT_SYSTEM_ROLE } from '../../consts';
 import { logger } from '../../logger';
 import type { BYOKMessage, BYOKRequest, BYOKTool, BYOKUsage } from '../../types';
+import { formatCacheLog, formatCacheRate, normalizeUsage } from '../../stats/usage';
 import {
 	classifyApiRequest,
 	formatModelFields,
@@ -625,7 +626,7 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 			logger.info(
 				formatRequestLogLine(
 					this.snapshot.requestKind,
-					`[cache-trace #${this.requestId}] result cacheRate=${hitRate}%` +
+					`[cache-trace #${this.requestId}] result cacheRate=${hitRate}` +
 						` ${this.prefixLabel}=${this.resultComparison.commonPrefixSummaryChars}` +
 						` chars (${this.resultComparison.commonPrefixSummaryPercent.toFixed(1)}%)`,
 				),
@@ -802,25 +803,33 @@ function logUsage(
 	context: UsageLogContext,
 	requestId?: number,
 ): void {
-	const cacheHit = usage.prompt_cache_hit_tokens ?? 0;
-	const cacheMiss = usage.prompt_cache_miss_tokens ?? 0;
+	const normalized = normalizeUsage(usage);
+	const cacheLabel = formatCacheLog(normalized.cache, normalized.cacheRate);
+	const invalidLabel = normalized.valid ? '' : ' | invalid=nan (skipped from stats)';
+	const sourceLabel =
+		normalized.cacheSource !== 'none' ? ` | cacheSource=${normalized.cacheSource}` : '';
+
 	logger.info(
 		formatRequestLogLine(
 			context.requestKind,
 			`tokens${requestId ? ` #${requestId}` : ''}: ` +
 				formatModelFields(context.vscodeModelId, context.apiModelId) +
-				` prompt=${usage.prompt_tokens} completion=${usage.completion_tokens}` +
-				` | cache: hit=${cacheHit} miss=${cacheMiss} rate=${getCacheHitRate(usage)}%` +
-				` | chars/tok=${charsPerToken.toFixed(2)}`,
+				` prompt=${formatTokenCount(usage.prompt_tokens)}` +
+				` completion=${formatTokenCount(usage.completion_tokens)}` +
+				` | cache: ${cacheLabel}` +
+				` | chars/tok=${formatTokenCount(charsPerToken)}` +
+				sourceLabel +
+				invalidLabel,
 		),
 	);
 }
 
+function formatTokenCount(value: number): string {
+	return Number.isFinite(value) ? String(value) : 'n/a';
+}
+
 function getCacheHitRate(usage: BYOKUsage): string {
-	const cacheHit = usage.prompt_cache_hit_tokens ?? 0;
-	const cacheMiss = usage.prompt_cache_miss_tokens ?? 0;
-	const cacheTotal = cacheHit + cacheMiss;
-	return cacheTotal > 0 ? ((cacheHit / cacheTotal) * 100).toFixed(0) : 'n/a';
+	return formatCacheRate(normalizeUsage(usage).cacheRate);
 }
 
 function summarizeVisionResolution(

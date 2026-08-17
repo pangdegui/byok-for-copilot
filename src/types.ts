@@ -34,8 +34,16 @@ export interface BYOKUsage {
 	prompt_tokens: number;
 	completion_tokens: number;
 	total_tokens: number;
+	/** DeepSeek / OpenAI-compatible flat cache fields. */
 	prompt_cache_hit_tokens?: number;
 	prompt_cache_miss_tokens?: number;
+	/** OpenAI official format: usage.prompt_tokens_details.cached_tokens. */
+	prompt_tokens_details?: {
+		cached_tokens?: number;
+	};
+	/** Anthropic Messages format cache fields. */
+	cache_read_input_tokens?: number;
+	cache_creation_input_tokens?: number;
 }
 
 export interface BYOKRequest {

@@ -21,6 +21,10 @@ import { resolveImageMessages, type VisionDescriber } from './vision';
 export interface PreparedChatRequest {
 	client: ReturnType<typeof createClient>;
 	request: Record<string, unknown>;
+	/** VS Code model id, e.g. `deepseek-v4-flash@opencode`. */
+	vscodeModelId: string;
+	/** Upstream API model id actually sent to the endpoint. */
+	apiModelId: string;
 	isThinkingModel: boolean;
 	totalRequestChars: number;
 	trailingToolResultIds: string[];
@@ -154,6 +158,8 @@ export async function prepareChatRequest({
 	return {
 		client,
 		request,
+		vscodeModelId: modelInfo.id,
+		apiModelId: getApiModelId(baseModelId),
 		isThinkingModel,
 		totalRequestChars,
 		trailingToolResultIds: collectTrailingToolResultIds(apiMessages),

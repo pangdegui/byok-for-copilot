@@ -3,7 +3,7 @@
   "displayName": "BYOK for Copilot Chat",
   "description": "Bring your own key — use any OpenAI-compatible LLM in Copilot Chat. Vision proxy, thinking mode, agent tools.",
   "icon": "resources/icon.png",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "publisher": "open-tools",
   "license": "MIT",
   "repository": {
@@ -36,8 +36,7 @@
   ],
   "activationEvents": [
     "onUri",
-    "onStartupFinished",
-    "onView:byok-copilot.endpointsSidebar"
+    "onStartupFinished"
   ],
   "enabledApiProposals": [],
   "main": "./out/extension.js",
@@ -114,6 +113,16 @@
         "command": "byok-copilot.deleteModelFromEndpoint",
         "title": "%byok-copilot.command.deleteModelFromEndpoint%",
         "icon": "$(trash)"
+      },
+      {
+        "command": "byok-copilot.openStatsPanel",
+        "title": "%byok-copilot.command.openStatsPanel%",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "byok-copilot.refreshUsageStats",
+        "title": "%byok-copilot.command.refreshUsageStats%",
+        "icon": "$(refresh)"
       }
     ],
     "viewsContainers": {
@@ -129,7 +138,13 @@
       "byok-copilot": [
         {
           "id": "byok-copilot.endpointsSidebar",
-          "name": "%byok-copilot.views.endpointsSidebar.name%"
+          "name": "%byok-copilot.views.endpointsSidebar.name%",
+          "icon": "$(server)"
+        },
+        {
+          "id": "byok-copilot.statsSidebar",
+          "name": "%byok-copilot.views.statsSidebar.name%",
+          "icon": "$(dashboard)"
         }
       ]
     },
@@ -143,6 +158,16 @@
         {
           "command": "byok-copilot.refreshEndpoints",
           "when": "view == byok-copilot.endpointsSidebar",
+          "group": "navigation"
+        },
+        {
+          "command": "byok-copilot.openStatsPanel",
+          "when": "view == byok-copilot.statsSidebar",
+          "group": "navigation"
+        },
+        {
+          "command": "byok-copilot.refreshUsageStats",
+          "when": "view == byok-copilot.statsSidebar",
           "group": "navigation"
         }
       ],
@@ -196,6 +221,11 @@
           "command": "byok-copilot.deleteEndpoint",
           "when": "view == byok-copilot.endpointsSidebar && viewItem =~ /^(endpointKeyUnset|endpointKeySet)$/",
           "group": "z_delete"
+        },
+        {
+          "command": "byok-copilot.openStatsPanel",
+          "when": "view == byok-copilot.statsSidebar && viewItem =~ /^(statsSummary|statsModel)$/",
+          "group": "inline@1"
         }
       ]
     },
@@ -367,7 +397,8 @@
     "lint": "oxlint",
     "format": "oxfmt --write src/",
     "format:check": "oxfmt --check src/",
-    "package": "vsce package --readme-path dist/README.marketplace.md -o dist/",
+    "package": "node scripts/package.mjs",
+    "package:skip-compile": "node scripts/package.mjs --skip-compile",
     "login": "vsce login open-tools"
   },
   "devDependencies": {

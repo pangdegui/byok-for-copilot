@@ -7,6 +7,7 @@ import { registerCommands } from './commands';
 import { initializeDiagnostics } from './diagnostics';
 import { registerProvider } from './provider';
 import { registerEndpointsSidebar } from '../sidebar/tree';
+import { initializeUsageTracker, registerUsageStatsSidebar, openStatsPanel } from '../stats';
 import { showWelcomeIfNeeded } from './welcome';
 
 let activeProvider: Awaited<ReturnType<typeof registerProvider>> | undefined;
@@ -19,6 +20,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	} catch (e) {
 		console.error('[BYOK] initializeDiagnostics failed:', e);
 	}
+
+	// Initialize the long-term usage statistics tracker (persisted in globalState).
+	const usageTracker = initializeUsageTracker(context);
+	console.log('[BYOK] usage tracker initialized');
 
 	try {
 		registerCommands(context);
@@ -35,6 +40,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	}
 
 	try {
+		registerUsageStatsSidebar(context, usageTracker);
+		console.log('[BYOK] usage stats sidebar registered');
+
+		context.subscriptions.push(
+			vscode.commands.registerCommand('byok-copilot.openStatsPanel', () => {
+				openStatsPanel(usageTracker);
+			}),
+		);
+
 		const provider = await registerProvider(context);
 		activeProvider = provider;
 		console.log('[BYOK] provider registered');

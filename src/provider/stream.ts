@@ -9,6 +9,8 @@ import {
 	type CacheDiagnosticsRun,
 	type ReplayMarkerReportTrigger,
 } from './debug';
+import { recordUsageEvent } from '../stats/tracker';
+import { normalizeUsage } from '../stats/usage';
 import { formatRequestLogLine, type RequestKind } from './routing';
 import {
 	createReplayMarkerPart,
@@ -103,6 +105,7 @@ export function streamChatCompletion({
 					);
 					setCharsPerToken(charsPerToken);
 					prepared.cacheDiagnostics.onUsage(usage, charsPerToken);
+					recordUsageEvent(prepared.vscodeModelId, prepared.apiModelId, usage, charsPerToken);
 					reportCopilotContextUsage(progress, usage, prepared.requestKind);
 				},
 			},
@@ -286,12 +289,14 @@ function reportCopilotContextUsage(
 	usage: BYOKUsage,
 	requestKind: RequestKind,
 ): void {
+	const normalized = normalizeUsage(usage);
 	const data = {
 		prompt_tokens: usage.prompt_tokens,
 		completion_tokens: usage.completion_tokens,
 		total_tokens: usage.total_tokens,
 		prompt_tokens_details: {
-			cached_tokens: usage.prompt_cache_hit_tokens ?? 0,
+			cached_tokens: normalized.cache.hit,
+			uncached_tokens: normalized.cache.miss,
 		},
 	};
 

@@ -15,6 +15,7 @@ Supports the OpenAI-compatible protocol and the Anthropic Messages protocol, wit
 - 👁️ **Vision Proxy** — Independent vision proxy system that provides image understanding for models without native multimodal support
 - 📦 **Multi-Endpoint Management** — Configure multiple API endpoints via sidebar or settings
 - 🔄 **Replay Markers** — Enable context caching to reduce request costs
+- 📊 **Usage Statistics** — Per-model long-term token & cache statistics (totals and averages), shown in the sidebar and a full statistics panel
 
 ## Quick Start
 
@@ -141,6 +142,17 @@ The sidebar supports full endpoint management:
 - Add / remove models per endpoint
 - Independent authentication method per endpoint (`bearer` / `x-api-key`)
 - Independent protocol and API version per endpoint
+
+### Usage Statistics
+
+The **Usage Statistics** view (in the BYOK Activity Bar) shows a compact summary per model. Click the **Open Usage Statistics** button to open the full statistics panel, which includes:
+
+- Per-model totals and averages for input / output / total tokens
+- Cache hit & miss token counts and the aggregate cache hit rate
+- Average `chars/token` ratio for token-count calibration
+- Controls to refresh, export (JSON), reset a single model, or reset all data
+
+Statistics are aggregated from every request's usage report and persisted locally in VS Code's global state — nothing is uploaded. Requests whose token counts are `NaN`/invalid are skipped so they never pollute the long-term numbers.
 
 ### Model ID Overrides
 
