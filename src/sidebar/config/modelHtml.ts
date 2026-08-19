@@ -19,6 +19,7 @@ export interface ModelConfigEntry {
 		thinking: boolean;
 	};
 	requiresThinkingParam?: boolean;
+	isTemplateDefault?: boolean;
 	priceCategory?: string;
 }
 
@@ -218,6 +219,15 @@ export function getModelPanelHtml(webview: vscode.Webview, state: ModelPanelStat
 		setCheck('capImageInput', entry.capabilities ? entry.capabilities.imageInput : false);
 		setCheck('capThinking', entry.capabilities ? entry.capabilities.thinking : false);
 		setCheck('requiresThinkingParam', entry.requiresThinkingParam);
+
+		const lockDefault = !!entry.isTemplateDefault;
+		for (const id of ['capToolCalling', 'capImageInput', 'capThinking', 'requiresThinkingParam']) {
+			const input = document.getElementById(id);
+			if (input) {
+				input.disabled = lockDefault;
+				input.title = lockDefault ? '默认模板能力，不能修改' : '';
+			}
+		}
 
 		function num(id) {
 			const v = document.getElementById(id).value.trim();

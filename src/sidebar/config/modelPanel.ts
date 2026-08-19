@@ -76,6 +76,7 @@ async function buildState(endpointName: string, modelId: string): Promise<ModelP
 	}
 	const style: EndpointStyle = resolved.style;
 	const template = MODEL_TEMPLATES.find((m) => m.id === modelId);
+	const isTemplateDefault = !!template && !resolved.modelEntry;
 
 	const base: ModelConfigEntry = {
 		id: modelId,
@@ -92,12 +93,13 @@ async function buildState(endpointName: string, modelId: string): Promise<ModelP
 				}
 			: { toolCalling: false, imageInput: false, thinking: false },
 		requiresThinkingParam: template?.requiresThinkingParam,
+		isTemplateDefault,
 		priceCategory: template?.priceCategory,
 	};
 
 	// Per-model entry always wins when present (单独配置优先生效).
 	const entry: ModelConfigEntry = resolved.modelEntry
-		? { ...base, ...(resolved.modelEntry as EndpointModelEntry), id: modelId }
+		? { ...base, ...(resolved.modelEntry as EndpointModelEntry), id: modelId, isTemplateDefault: false }
 		: base;
 
 	return { endpointName, modelId, style, entry };
