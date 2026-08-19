@@ -1,20 +1,32 @@
 import vscode from 'vscode';
 import type { AuthManager } from '../auth';
 import { CONFIG_SECTION, API_KEY_SECRET } from '../consts';
-import { getEndpoints, type EndpointConfig } from '../config';
+import { openEndpointConfigPanel } from './config/panel';
+import { openModelConfigPanel } from './config/modelPanel';
+import {
+	getEndpoints,
+	getEndpointModelIds,
+	getStyleForModel,
+	getResolvedStyleModel,
+	ENDPOINT_STYLES,
+	type EndpointConfig,
+	type EndpointStyle,
+	type EndpointStyleConfig,
+} from '../config';
 
 const VIEW_ID = 'byok-copilot.endpointsSidebar';
 
 enum TreeItemType {
 	ENDPOINT = 1,
 	KEY_ITEM = 2,
-	MODELS_HEADER = 3,
+	STYLE_HEADER = 3,
 	MODEL_ITEM = 4,
 }
 
 class EndpointTreeItem extends vscode.TreeItem {
 	type: TreeItemType;
 	endpointName: string;
+	style: EndpointStyle | undefined;
 	modelId: string | undefined;
 
 	constructor(
@@ -26,6 +38,7 @@ class EndpointTreeItem extends vscode.TreeItem {
 		super(label, collapsibleState ?? vscode.TreeItemCollapsibleState.None);
 		this.type = type;
 		this.endpointName = endpointName;
+		this.style = undefined;
 		this.modelId = undefined;
 	}
 }
@@ -52,12 +65,61 @@ function resolveModelId(arg: unknown): string {
 	return '';
 }
 
+/** 从 tree view 内联按钮回调参数中提取风格（style header 会携带其所属风格） */
+function resolveStyle(arg: unknown): EndpointStyle | undefined {
+	if (arg instanceof EndpointTreeItem) {
+		return arg.style;
+	}
+	return undefined;
+}
+
 function iconPath(color: string): vscode.Uri {
 	return vscode.Uri.parse(
 		`data:image/svg+xml,${encodeURIComponent(
 			`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><circle cx="8" cy="8" r="4" fill="${encodeURIComponent(color)}"/></svg>`,
 		)}`,
 	);
+}
+
+function styleLabel(style: EndpointStyle): string {
+	switch (style) {
+		case 'openai-responses':
+			return 'OpenAI Responses';
+		case 'anthropic-messages':
+			return 'Claude';
+		default:
+			return 'OpenAI Chat';
+	}
+}
+
+function describeEndpointStyles(ep: EndpointConfig): string {
+	const labels = ENDPOINT_STYLES.filter(
+		(s) => ep.styles[s] && ep.styles[s]!.models.length > 0,
+	).map((s) => styleLabel(s));
+	return labels.length > 0 ? labels.join(' / ') : '未配置';
+}
+
+const STYLE_PICKS: { label: string; description: EndpointStyle; detail: string }[] = [
+	{
+		label: 'OpenAI Chat Completions',
+		description: 'openai-chat',
+		detail: '适用于 OpenAI 及兼容 API（聊天补全）',
+	},
+	{
+		label: 'OpenAI Responses',
+		description: 'openai-responses',
+		detail: '适用于 OpenAI Responses API',
+	},
+	{
+		label: 'Anthropic Claude Messages',
+		description: 'anthropic-messages',
+		detail: '适用于 Claude 及兼容 API',
+	},
+];
+
+async function pickStyle(prompt: string): Promise<EndpointStyle | undefined> {
+	const pick = await vscode.window.showQuickPick(STYLE_PICKS, { placeHolder: prompt });
+	return pick?.description;
 }
 
 export class EndpointsTreeDataProvider implements vscode.TreeDataProvider<EndpointTreeItem> {
@@ -86,6 +148,9 @@ export class EndpointsTreeDataProvider implements vscode.TreeDataProvider<Endpoi
 				return this.buildEndpointChildren(ep);
 			}
 		}
+		if (element.type === TreeItemType.STYLE_HEADER) {
+			return this.buildStyleChildren(element.endpointName, element.style);
+		}
 		return [];
 	}
 
@@ -95,20 +160,20 @@ export class EndpointsTreeDataProvider implements vscode.TreeDataProvider<Endpoi
 
 		for (const ep of endpoints) {
 			const hasKey = await this.getKeyStatus(ep.name);
-			const protocolLabel = ep.protocol === 'anthropic-messages' ? 'Anthropic' : 'OpenAI';
+			const styleSummary = describeEndpointStyles(ep);
 			const epItem = new EndpointTreeItem(
 				ep.name,
 				TreeItemType.ENDPOINT,
 				ep.name,
 				vscode.TreeItemCollapsibleState.Expanded,
 			);
-			epItem.description = `${ep.baseUrl.replace(/^https?:\/\//, '').replace(/\/+$/, '')} (${protocolLabel})`;
+			epItem.description = `${ep.baseUrl.replace(/^https?:\/\//, '').replace(/\/+$/, '')} (${styleSummary})`;
 			epItem.iconPath = hasKey ? iconPath('#4caf50') : iconPath('#ff9800');
 			epItem.tooltip = [
 				`端点: ${ep.name}`,
 				`URL: ${ep.baseUrl}`,
-				`协议: ${ep.protocol || 'openai-completions'}`,
-				`模型: ${ep.models.map(m => typeof m === 'string' ? m : m.id).join(', ')}`,
+				`风格: ${styleSummary}`,
+				`模型: ${getEndpointModelIds(ep).join(', ')}`,
 				`API Key: ${hasKey ? '已配置 ✓' : '未配置 ✗'}`,
 			].join('\n');
 
@@ -136,30 +201,60 @@ export class EndpointsTreeDataProvider implements vscode.TreeDataProvider<Endpoi
 		keyItem.contextValue = hasKey ? 'endpointKeyItemSet' : 'endpointKeyItemUnset';
 		items.push(keyItem);
 
-		// ---- Models header (with inline add model icon) ----
-		const modelsHeader = new EndpointTreeItem(
-			`模型 (${endpoint.models.length})`,
-			TreeItemType.MODELS_HEADER,
-			endpoint.name,
-		);
-		modelsHeader.iconPath = new vscode.ThemeIcon('symbol-class');
-		modelsHeader.tooltip = '此端点服务的模型列表';
-		modelsHeader.contextValue = 'modelsHeader';
-		items.push(modelsHeader);
+		// ---- Style groups: Endpoint -> Style -> Model ----
+		for (const style of ENDPOINT_STYLES) {
+			const styleConfig = endpoint.styles[style];
+			if (!styleConfig || styleConfig.models.length === 0) {
+				continue;
+			}
+			const styleHeader = new EndpointTreeItem(
+				`${styleLabel(style)} (${styleConfig.models.length})`,
+				TreeItemType.STYLE_HEADER,
+				endpoint.name,
+				vscode.TreeItemCollapsibleState.Expanded,
+			);
+			styleHeader.style = style;
+			styleHeader.iconPath = new vscode.ThemeIcon('symbol-class');
+			styleHeader.tooltip = `风格: ${style}`;
+			styleHeader.contextValue = 'styleHeader';
+			items.push(styleHeader);
+		}
 
-		// ---- Individual model items (with inline delete icon) ----
-		for (const m of endpoint.models) {
+		return items;
+	}
+
+	private async buildStyleChildren(
+		endpointName: string,
+		style: EndpointStyle | undefined,
+	): Promise<EndpointTreeItem[]> {
+		const ep = getEndpoints().find(e => e.name === endpointName);
+		if (!ep || !style) {
+			return [];
+		}
+		const styleConfig: EndpointStyleConfig | undefined = ep.styles[style];
+		if (!styleConfig) {
+			return [];
+		}
+
+		const items: EndpointTreeItem[] = [];
+		for (const m of styleConfig.models) {
 			const modelId = typeof m === 'string' ? m : m.id;
 			const modelDisplay = typeof m === 'string' ? m : (m.displayName || m.id);
 			const modelItem = new EndpointTreeItem(
 				modelDisplay,
 				TreeItemType.MODEL_ITEM,
-				endpoint.name,
+				endpointName,
 			);
 			modelItem.modelId = modelId;
 			modelItem.iconPath = new vscode.ThemeIcon('symbol-method');
 			modelItem.description = modelId !== modelDisplay ? modelId : '';
-			modelItem.tooltip = `模型 ID: ${modelId}`;
+			modelItem.tooltip = `模型 ID: ${modelId}\n风格: ${style}`;
+			// Hover gear button → open the per-model configuration page.
+			modelItem.command = {
+				command: 'byok-copilot.configureModel',
+				title: '$(gear) 配置模型',
+				arguments: [modelItem],
+			};
 			modelItem.contextValue = 'modelItem';
 			items.push(modelItem);
 		}
@@ -193,7 +288,9 @@ async function updateEndpointConfig(
 	if (idx === -1) {
 		return;
 	}
-	const updated = updater(existing[idx]);
+	// 归一化为新的 endpoint -> style -> model 结构，避免操作到旧版扁平数据。
+	const normalized = getEndpoints().find(e => e.name === endpointName)!;
+	const updated = updater(normalized);
 	if (updated === null) {
 		existing.splice(idx, 1);
 	} else {
@@ -250,15 +347,12 @@ export async function registerEndpointsSidebar(
 			});
 			if (!baseUrl) return;
 
-			const protocol = await vscode.window.showQuickPick([
-				{ label: 'OpenAI Chat Completions', description: 'openai-completions', detail: '适用于 OpenAI 及兼容 API' },
-				{ label: 'Anthropic Messages', description: 'anthropic-messages', detail: '适用于 Claude 及兼容 API' },
-			], { placeHolder: '选择 API 协议类型' });
-			if (!protocol) return;
+			const style = await pickStyle('选择 API 风格（三种风格平等，同一端点可配多种）');
+			if (!style) return;
 
 			const models = await vscode.window.showInputBox({
 				prompt: '模型列表（逗号分隔）',
-				placeHolder: 'gpt-4o, claude-sonnet-4',
+				placeHolder: 'gpt-4o, gpt-4o-mini',
 				value: 'gpt-4o',
 				validateInput: (v: string) => !v?.trim() ? '至少需要一个模型' : undefined,
 			});
@@ -268,68 +362,32 @@ export async function registerEndpointsSidebar(
 			const newEndpoint = {
 				name: name.trim(),
 				baseUrl: baseUrl.trim().replace(/\/+$/, ''),
-				protocol: protocol.description,
-				models: modelList,
+				styles: {
+					[style]: { models: modelList },
+				},
 			};
 
 			const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
 			const existing = config.get<unknown[]>('endpoints', []);
 			await config.update('endpoints', [...existing, newEndpoint], vscode.ConfigurationTarget.Global);
-			vscode.window.showInformationMessage(`端点 "${newEndpoint.name}" 已添加 (${protocol.label})`);
+			vscode.window.showInformationMessage(`端点 "${newEndpoint.name}" 已添加 (${styleLabel(style)})`);
 			treeDataProvider.refresh();
 		}),
 	);
 
-	// Edit endpoint
+	// Configure endpoint (opens the webview config panel)
 	context.subscriptions.push(
 		vscode.commands.registerCommand('byok-copilot.editEndpoint', async (arg: unknown) => {
 			const endpointName = resolveEndpointName(arg);
 			if (!endpointName) return;
 
-			const endpoints = getEndpoints();
-			const ep = endpoints.find(e => e.name === endpointName);
+			const ep = getEndpoints().find(e => e.name === endpointName);
 			if (!ep) {
 				vscode.window.showErrorMessage(`端点 "${endpointName}" 未找到`);
 				return;
 			}
 
-			const newBaseUrl = await vscode.window.showInputBox({
-				prompt: 'API 地址',
-				value: ep.baseUrl,
-				validateInput: (v: string) => {
-					if (!v?.trim()) return '地址不能为空';
-					try { new URL(v.trim()); return undefined; } catch { return '请输入有效的 URL'; }
-				},
-			});
-			if (!newBaseUrl) return;
-
-			const protocolPick = await vscode.window.showQuickPick([
-				{ label: 'OpenAI Chat Completions', description: 'openai-completions', detail: '适用于 OpenAI 及兼容 API' },
-				{ label: 'Anthropic Messages', description: 'anthropic-messages', detail: '适用于 Claude 及兼容 API' },
-			], { placeHolder: '选择 API 协议类型' });
-			if (!protocolPick) return;
-
-			const models = await vscode.window.showInputBox({
-				prompt: '模型列表（逗号分隔）',
-				value: ep.models.map(m => typeof m === 'string' ? m : m.id).join(', '),
-				validateInput: (v: string) => !v?.trim() ? '至少需要一个模型' : undefined,
-			});
-			if (!models) return;
-
-			const modelList = models.split(',').map(s => s.trim()).filter(s => s);
-			const confirm = await vscode.window.showWarningMessage(
-				`确定要更新端点 "${endpointName}" 吗？`, { modal: true }, '更新',
-			);
-			if (confirm !== '更新') return;
-
-			await updateEndpointConfig(endpointName, (ep) => ({
-				...ep,
-				baseUrl: newBaseUrl.trim().replace(/\/+$/, ''),
-				protocol: protocolPick.description as EndpointConfig['protocol'],
-				models: modelList,
-			}));
-			vscode.window.showInformationMessage(`端点 "${endpointName}" 已更新`);
-			treeDataProvider.refresh();
+			openEndpointConfigPanel(endpointName);
 		}),
 	);
 
@@ -369,7 +427,7 @@ export async function registerEndpointsSidebar(
 					endpoints.map((e) => ({
 						label: e.name,
 						description: e.baseUrl,
-						detail: `模型: ${e.models.map(m => typeof m === 'string' ? m : m.id).join(', ')}`,
+						detail: `模型: ${getEndpointModelIds(e).join(', ')}`,
 					})),
 					{ placeHolder: '选择要设置 API Key 的端点' },
 				);
@@ -404,14 +462,30 @@ export async function registerEndpointsSidebar(
 			const endpointName = resolveEndpointName(arg);
 			if (!endpointName) return;
 
+			const ep = getEndpoints().find(e => e.name === endpointName);
+			if (!ep) return;
+
+			// 从风格头（styleHeader）内联按钮触发时，直接锁定该端点-风格，
+			// 无需再让用户选择风格。仅从命令面板触发时才需要挑选。
+			let style: EndpointStyle | undefined = resolveStyle(arg);
+			if (!style) {
+				const existingStyles = ENDPOINT_STYLES.filter((s) => ep.styles[s]);
+				style =
+					existingStyles.length <= 1
+						? (existingStyles[0] || 'openai-chat')
+						: (await pickStyle(`为端点 "${endpointName}" 选择要添加模型的风格`)) || undefined;
+				if (!style) return;
+			}
+
 			const modelId = await vscode.window.showInputBox({
-				prompt: `为端点 "${endpointName}" 添加模型`,
+				prompt: `为端点 "${endpointName}" (${styleLabel(style)}) 添加模型`,
 				placeHolder: 'gpt-4o',
 				validateInput: (v: string) => {
 					if (!v?.trim()) return '模型 ID 不能为空';
-					const ep = getEndpoints().find(e => e.name === endpointName);
-					if (ep?.models.some(m => (typeof m === 'string' ? m : m.id) === v.trim())) {
-						return '此模型 ID 已存在';
+					// 仅阻止在同一风格的 models 数组内重复添加同一个 ID；
+					// 允许跨风格、跨端点出现完全重复的模型 ID。
+					if (ep.styles[style]?.models.some(m => (typeof m === 'string' ? m : m.id) === v.trim())) {
+						return '此模型 ID 已存在于当前风格';
 					}
 					return undefined;
 				},
@@ -421,9 +495,15 @@ export async function registerEndpointsSidebar(
 			const trimmedId = modelId.trim();
 			await updateEndpointConfig(endpointName, (ep) => ({
 				...ep,
-				models: [...ep.models, trimmedId],
+				styles: {
+					...ep.styles,
+					[style!]: {
+						...(ep.styles[style!] || {}),
+						models: [...(ep.styles[style!]?.models || []), trimmedId],
+					},
+				},
 			}));
-			vscode.window.showInformationMessage(`模型 "${trimmedId}" 已添加到端点 "${endpointName}"`);
+			vscode.window.showInformationMessage(`模型 "${trimmedId}" 已添加到端点 "${endpointName}" (${styleLabel(style)})`);
 			treeDataProvider.refresh();
 		}),
 	);
@@ -435,28 +515,58 @@ export async function registerEndpointsSidebar(
 			const modelId = resolveModelId(arg);
 			if (!endpointName || !modelId) return;
 
+			const style = getStyleForModel(endpointName, modelId);
+			if (!style) return;
+
 			const ep = getEndpoints().find(e => e.name === endpointName);
 			if (!ep) return;
 
-			// 不允许删除最后一个模型
-			if (ep.models.length <= 1) {
-				vscode.window.showErrorMessage('不能删除唯一的模型，端点至少需要一个模型');
+			const styleModels = ep.styles[style]?.models || [];
+			if (styleModels.length <= 1) {
+				vscode.window.showErrorMessage('不能删除该风格下唯一的模型');
 				return;
 			}
 
 			const confirm = await vscode.window.showWarningMessage(
-				`确定要从端点 "${endpointName}" 中删除模型 "${modelId}" 吗？`,
+				`确定要从端点 "${endpointName}" 的 ${styleLabel(style)} 中删除模型 "${modelId}" 吗？`,
 				{ modal: true },
 				'删除',
 			);
 			if (confirm !== '删除') return;
 
-			await updateEndpointConfig(endpointName, (ep) => ({
-				...ep,
-				models: ep.models.filter(m => (typeof m === 'string' ? m : m.id) !== modelId),
-			}));
-			vscode.window.showInformationMessage(`模型 "${modelId}" 已从端点 "${endpointName}" 中删除`);
+			await updateEndpointConfig(endpointName, (ep) => {
+				const sc = ep.styles[style!];
+				if (!sc) return ep;
+				return {
+					...ep,
+					styles: {
+						...ep.styles,
+						[style!]: {
+							...sc,
+							models: sc.models.filter(m => (typeof m === 'string' ? m : m.id) !== modelId),
+						},
+					},
+				};
+			});
+			vscode.window.showInformationMessage(`模型 "${modelId}" 已从端点 "${endpointName}" (${styleLabel(style)}) 中删除`);
 			treeDataProvider.refresh();
+		}),
+	);
+
+	// Configure a single model (opens the per-model config page).
+	context.subscriptions.push(
+		vscode.commands.registerCommand('byok-copilot.configureModel', async (arg: unknown) => {
+			const endpointName = resolveEndpointName(arg);
+			const modelId = resolveModelId(arg);
+			if (!endpointName || !modelId) {
+				return;
+			}
+			const resolved = getResolvedStyleModel(endpointName, modelId);
+			if (!resolved) {
+				vscode.window.showErrorMessage(`模型 "${modelId}" 在端点 "${endpointName}" 中未找到`);
+				return;
+			}
+			openModelConfigPanel(endpointName, modelId);
 		}),
 	);
 

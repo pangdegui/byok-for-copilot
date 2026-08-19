@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
 import { createClient } from '../client';
-import { getApiModelId, getMaxTokens, getEndpointForModel, getEndpointByName, getModelBaseUrl, getEndpointModelDef } from '../config';
+import { getApiModelId, getMaxTokens, getEndpointForModel, getEndpointByName, getModelBaseUrl, getResolvedStyleModel, type EndpointStyle } from '../config';
 import { MODEL_TEMPLATES } from '../consts';
 import { t } from '../i18n';
 import type { BYOKMessage, BYOKTool } from '../types';
@@ -78,19 +78,21 @@ export async function prepareChatRequest({
 		throw new Error(t('auth.notConfigured'));
 	}
 
-	// 优先使用 per-model baseUrl，其次端点 baseUrl
-	const modelBaseUrl = endpointNameFromId
-		? getModelBaseUrl(endpointNameFromId, baseModelId)
-		: undefined;
-	const baseUrl = modelBaseUrl || endpoint.baseUrl.replace(/\/+$/, '');
-	const endpointModelDef = endpointNameFromId
-		? getEndpointModelDef(endpointNameFromId, baseModelId)
-		: undefined;
-	const authType = endpointModelDef?.authType || 'bearer';
-	const protocol = endpoint.protocol || endpointModelDef?.protocol || 'openai-completions';
-	const anthropicVersion = endpoint.anthropicVersion || endpointModelDef?.anthropicVersion;
+	// Resolve which style (openai-chat / openai-responses / anthropic-messages)
+	// this model belongs to within the endpoint — the three-tier
+	// endpoint -> style -> model structure.
+	const resolved = endpointName ? getResolvedStyleModel(endpointName, baseModelId) : undefined;
+	const style: EndpointStyle = resolved?.style ?? 'openai-chat';
+	const styleConfig = resolved?.styleConfig;
+	const endpointModelDef = resolved?.modelEntry;
 
-	const client = createClient(protocol, baseUrl, apiKey, {
+	// baseUrl precedence: per-model override > per-style override > endpoint baseUrl
+	const modelBaseUrl = getModelBaseUrl(endpointName, baseModelId);
+	const baseUrl = modelBaseUrl || endpoint.baseUrl.replace(/\/+$/, '');
+	const authType = endpointModelDef?.authType || styleConfig?.authType || 'bearer';
+	const anthropicVersion = endpointModelDef?.anthropicVersion || styleConfig?.anthropicVersion;
+
+	const client = createClient(style, baseUrl, apiKey, {
 		authType,
 		anthropicVersion,
 	});
@@ -105,11 +107,12 @@ export async function prepareChatRequest({
 	const tools = prepareRequestTools(modelDef?.capabilities?.toolCalling, options);
 	const totalRequestChars = countMessageChars(apiMessages);
 
-	const isAnthropic = protocol === 'anthropic-messages';
-
-	const baseRequest: Record<string, unknown> = isAnthropic
-		? buildAnthropicRequest(baseModelId, apiMessages, tools, maxTokens) as unknown as Record<string, unknown>
-		: buildOpenAIRequest(baseModelId, apiMessages, tools, maxTokens) as unknown as Record<string, unknown>;
+	const baseRequest: Record<string, unknown> =
+		style === 'anthropic-messages'
+			? (buildAnthropicRequest(baseModelId, apiMessages, tools, maxTokens) as unknown as Record<string, unknown>)
+			: style === 'openai-responses'
+				? (buildResponsesRequest(baseModelId, apiMessages, tools, maxTokens) as unknown as Record<string, unknown>)
+				: (buildOpenAIRequest(baseModelId, apiMessages, tools, maxTokens) as unknown as Record<string, unknown>);
 
 	const requestKind = classifyApiRequest({
 		request: baseRequest as unknown as import('../types').BYOKRequest,
@@ -120,9 +123,12 @@ export async function prepareChatRequest({
 	);
 	const thinkingEffort = configuredThinkingEffort;
 
-	const request: Record<string, unknown> = isAnthropic
-		? finalizeAnthropicRequest(baseRequest, isThinkingModel, thinkingEffort, maxTokens) as unknown as Record<string, unknown>
-		: finalizeOpenAIRequest(baseRequest as unknown as import('../types').BYOKRequest, isThinkingModel, thinkingEffort as import('./models').ThinkingEffort) as unknown as Record<string, unknown>;
+	const request: Record<string, unknown> =
+		style === 'anthropic-messages'
+			? (finalizeAnthropicRequest(baseRequest, isThinkingModel, thinkingEffort, maxTokens) as unknown as Record<string, unknown>)
+			: style === 'openai-responses'
+				? (finalizeResponsesRequest(baseRequest, isThinkingModel, thinkingEffort as import('./models').ThinkingEffort) as unknown as Record<string, unknown>)
+				: (finalizeOpenAIRequest(baseRequest as unknown as import('../types').BYOKRequest, isThinkingModel, thinkingEffort as import('./models').ThinkingEffort) as unknown as Record<string, unknown>);
 
 	dumpApiRequest(request as unknown as import('../types').BYOKRequest, {
 		globalStorageUri,
@@ -205,6 +211,108 @@ function finalizeOpenAIRequest(
 		},
 		...(thinkingEffort === 'none' ? {} : { reasoning_effort: thinkingEffort }),
 	};
+}
+
+function buildResponsesRequest(
+	baseModelId: string,
+	messages: BYOKMessage[],
+	tools: BYOKTool[] | undefined,
+	maxTokens: number | undefined,
+): Record<string, unknown> {
+	// Responses API: system prompt is passed via top-level `instructions`
+	let instructions: string | undefined;
+	let filteredMessages = messages;
+	if (messages.length > 0 && messages[0].role === 'system') {
+		instructions = messages[0].content;
+		filteredMessages = messages.slice(1);
+	}
+
+	const input = convertMessagesToResponsesInput(filteredMessages);
+	const responsesTools = tools
+		? tools.map((t) => ({
+				type: 'function',
+				name: t.function.name,
+				description: t.function.description,
+				parameters: t.function.parameters,
+			}))
+		: undefined;
+
+	const request: Record<string, unknown> = {
+		model: getApiModelId(baseModelId),
+		input,
+		stream: true,
+	};
+	if (instructions) {
+		request.instructions = instructions;
+	}
+	if (responsesTools && responsesTools.length > 0) {
+		request.tools = responsesTools;
+	}
+	if (maxTokens) {
+		request.max_output_tokens = maxTokens;
+	}
+	return request;
+}
+
+function finalizeResponsesRequest(
+	baseRequest: Record<string, unknown>,
+	isThinkingModel: boolean,
+	thinkingEffort: import('./models').ThinkingEffort,
+): Record<string, unknown> {
+	if (!isThinkingModel || thinkingEffort === 'none') {
+		return baseRequest;
+	}
+	return {
+		...baseRequest,
+		reasoning: { effort: thinkingEffort },
+	};
+}
+
+/**
+ * Convert OpenAI-style messages (system/user/assistant/tool with tool_calls)
+ * into OpenAI Responses API `input` items.
+ */
+function convertMessagesToResponsesInput(messages: BYOKMessage[]): Record<string, unknown>[] {
+	const result: Record<string, unknown>[] = [];
+	for (const msg of messages) {
+		if (msg.role === 'system') {
+			result.push({
+				role: 'system',
+				content: [{ type: 'input_text', text: msg.content }],
+			});
+		} else if (msg.role === 'tool') {
+			result.push({
+				type: 'function_call_output',
+				call_id: msg.tool_call_id || '',
+				output: msg.content || '',
+			});
+		} else if (msg.role === 'assistant') {
+			const content: Record<string, unknown>[] = [];
+			if (msg.reasoning_content) {
+				content.push({ type: 'output_text', text: msg.reasoning_content });
+			}
+			if (msg.content) {
+				content.push({ type: 'output_text', text: msg.content });
+			}
+			const item: Record<string, unknown> = { role: 'assistant', content };
+			if (msg.tool_calls && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
+				item.tool_calls = msg.tool_calls.map((tc) => ({
+					id: tc.id,
+					type: 'function',
+					name: tc.function.name,
+					arguments: tc.function.arguments,
+				}));
+			}
+			result.push(item);
+		} else {
+			// user
+			result.push({
+				role: 'user',
+				content: [{ type: 'input_text', text: msg.content }],
+			});
+		}
+	}
+	return result;
 }
 
 function buildAnthropicRequest(

@@ -46,28 +46,45 @@ Not yet published on the VS Marketplace. Please install locally from source.
 3. Fill in:
    - **Name** — a friendly identifier (e.g., `my-provider`)
    - **API URL** — the base URL of your API provider
-   - **Protocol** — `openai-completions` or `anthropic-messages`
-   - **Models** — comma-separated model IDs
+   - **Style** — one of the three equal styles: `openai-chat`, `openai-responses`, or `anthropic-messages`
+   - **Models** — comma-separated model IDs under that style
 4. Click the endpoint entry and set your **API Key**
 
 #### Via Settings
+
+Endpoints are organized as **Endpoint → Style → Model**. Each endpoint can expose
+multiple styles at once (the three styles are equal peers), and models are attached
+to the style they belong to:
 
 ```json
 "byok-copilot.endpoints": [
   {
     "name": "my-openai",
     "baseUrl": "https://api.openai.com/v1",
-    "protocol": "openai-completions",
-    "models": ["gpt-4o", "gpt-4-turbo"]
+    "styles": {
+      "openai-chat": { "models": ["gpt-4o", "gpt-4-turbo"] },
+      "openai-responses": { "models": ["gpt-4o"] }
+    }
   },
   {
     "name": "my-anthropic",
     "baseUrl": "https://api.anthropic.com",
-    "protocol": "anthropic-messages",
-    "models": ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"]
+    "styles": {
+      "anthropic-messages": {
+        "models": ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"],
+        "anthropicVersion": "2023-06-01"
+      }
+    }
   }
 ]
 ```
+
+> The legacy flat format (`models` + `protocol` + optional `anthropicVersion`) is
+> still accepted and automatically normalized into the `styles` structure.
+
+> 📌 A model ID can only be mounted on **one** style per endpoint. Different
+> styles may still use identical model *configuration* values, but each model ID
+> belongs to exactly one style.
 
 ### Select a Model
 
@@ -77,15 +94,23 @@ Not yet published on the VS Marketplace. Please install locally from source.
 
 > 💡 If models are hidden, run `Developer: Manage Language Models` to check whether BYOK models are visible.
 
-## Supported Protocols
+## Supported Styles
 
-### OpenAI-Compatible (`openai-completions`)
+The three API styles are treated as equal peers and can coexist on the same endpoint.
+
+### OpenAI Chat (`openai-chat`)
 
 Works with any API provider that offers the `/chat/completions` endpoint:
 
 - OpenAI (GPT-4o, GPT-4-turbo, etc.)
 - DeepSeek
 - Any compatible third-party proxy or self-hosted service
+
+### OpenAI Responses (`openai-responses`)
+
+Works with the OpenAI Responses API (`/responses` endpoint):
+
+- OpenAI GPT-5 / Responses-compatible models and services
 
 ### Anthropic Messages (`anthropic-messages`)
 
@@ -94,7 +119,7 @@ Works with the Anthropic Messages API:
 - Claude 3.5 Sonnet / Haiku
 - Claude 3 Opus / Sonnet
 
-You can set a custom `anthropicVersion` in the endpoint configuration if needed.
+You can set a custom `anthropicVersion` in the style (or legacy endpoint) configuration if needed.
 
 ## Feature Details
 

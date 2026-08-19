@@ -92,7 +92,7 @@
       {
         "command": "byok-copilot.editEndpoint",
         "title": "%byok-copilot.command.editEndpoint%",
-        "icon": "$(edit)"
+        "icon": "$(gear)"
       },
       {
         "command": "byok-copilot.clearEndpointApiKeyFromSidebar",
@@ -113,6 +113,11 @@
         "command": "byok-copilot.deleteModelFromEndpoint",
         "title": "%byok-copilot.command.deleteModelFromEndpoint%",
         "icon": "$(trash)"
+      },
+      {
+        "command": "byok-copilot.configureModel",
+        "title": "%byok-copilot.command.configureModel%",
+        "icon": "$(gear)"
       },
       {
         "command": "byok-copilot.openStatsPanel",
@@ -204,13 +209,18 @@
         },
         {
           "command": "byok-copilot.addModelToEndpoint",
-          "when": "view == byok-copilot.endpointsSidebar && viewItem == modelsHeader",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem == styleHeader",
           "group": "inline@1"
         },
         {
           "command": "byok-copilot.deleteModelFromEndpoint",
           "when": "view == byok-copilot.endpointsSidebar && viewItem == modelItem",
           "group": "inline@1"
+        },
+        {
+          "command": "byok-copilot.configureModel",
+          "when": "view == byok-copilot.endpointsSidebar && viewItem == modelItem",
+          "group": "z_configure"
         },
         {
           "command": "byok-copilot.editEndpoint",
@@ -269,59 +279,397 @@
       "title": "%byok-copilot.config.title%",
       "properties": {
         "byok-copilot.endpoints": {
-          "type": "array",
-          "default": [],
-          "description": "%byok-copilot.config.endpoints.description%",
-          "items": {
+  "type": "array",
+  "default": [],
+  "description": "%byok-copilot.config.endpoints.description%",
+  "items": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "%byok-copilot.config.endpoints.name.description%"
+      },
+      "baseUrl": {
+        "type": "string",
+        "description": "%byok-copilot.config.endpoints.baseUrl.description%"
+      },
+      "styles": {
+        "type": "object",
+        "description": "%byok-copilot.config.endpoints.styles.description%",
+        "properties": {
+          "openai-chat": {
             "type": "object",
+            "description": "%byok-copilot.config.endpoints.styles.openaiChat.description%",
             "properties": {
-              "name": {
-                "type": "string",
-                "description": "%byok-copilot.config.endpoints.name.description%"
-              },
-              "baseUrl": {
-                "type": "string",
-                "description": "%byok-copilot.config.endpoints.baseUrl.description%"
-              },
               "models": {
                 "type": "array",
                 "items": {
                   "anyOf": [
-                    { "type": "string" },
+                    {
+                      "type": "string"
+                    },
                     {
                       "type": "object",
                       "properties": {
-                        "id": { "type": "string" },
-                        "displayName": { "type": "string" },
-                        "baseUrl": { "type": "string" },
-                        "authType": { "type": "string" },
-                        "protocol": { "type": "string" },
-                        "anthropicVersion": { "type": "string" },
-                        "family": { "type": "string" },
-                        "version": { "type": "string" },
-                        "maxInputTokens": { "type": "number" },
-                        "maxOutputTokens": { "type": "number" }
+                        "id": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "baseUrl": {
+                          "type": "string"
+                        },
+                        "authType": {
+                          "type": "string"
+                        },
+                        "family": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string"
+                        },
+                        "maxInputTokens": {
+                          "type": "number"
+                        },
+                        "maxOutputTokens": {
+                          "type": "number"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "requiresThinkingParam": {
+                          "type": "boolean"
+                        },
+                        "priceCategory": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "mid",
+                            "high"
+                          ]
+                        },
+                        "capabilities": {
+                          "type": "object",
+                          "properties": {
+                            "toolCalling": {
+                              "type": [
+                                "boolean",
+                                "number"
+                              ]
+                            },
+                            "imageInput": {
+                              "type": "boolean"
+                            },
+                            "thinking": {
+                              "type": "boolean"
+                            }
+                          }
+                        }
                       },
-                      "required": ["id"]
+                      "required": [
+                        "id"
+                      ]
                     }
                   ]
-                },
-                "description": "%byok-copilot.config.endpoints.models.description%"
+                }
               },
-              "protocol": {
+              "baseUrl": {
+                "type": "string"
+              },
+              "authType": {
                 "type": "string",
-                "enum": ["openai-completions", "anthropic-messages"],
-                "description": "%byok-copilot.config.endpoints.protocol.description%"
+                "enum": [
+                  "bearer",
+                  "x-api-key"
+                ]
+              }
+            }
+          },
+          "openai-responses": {
+            "type": "object",
+            "description": "%byok-copilot.config.endpoints.styles.openaiResponses.description%",
+            "properties": {
+              "models": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "baseUrl": {
+                          "type": "string"
+                        },
+                        "authType": {
+                          "type": "string"
+                        },
+                        "family": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string"
+                        },
+                        "maxInputTokens": {
+                          "type": "number"
+                        },
+                        "maxOutputTokens": {
+                          "type": "number"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "requiresThinkingParam": {
+                          "type": "boolean"
+                        },
+                        "priceCategory": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "mid",
+                            "high"
+                          ]
+                        },
+                        "capabilities": {
+                          "type": "object",
+                          "properties": {
+                            "toolCalling": {
+                              "type": [
+                                "boolean",
+                                "number"
+                              ]
+                            },
+                            "imageInput": {
+                              "type": "boolean"
+                            },
+                            "thinking": {
+                              "type": "boolean"
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "baseUrl": {
+                "type": "string"
+              },
+              "authType": {
+                "type": "string",
+                "enum": [
+                  "bearer",
+                  "x-api-key"
+                ]
+              }
+            }
+          },
+          "anthropic-messages": {
+            "type": "object",
+            "description": "%byok-copilot.config.endpoints.styles.anthropicMessages.description%",
+            "properties": {
+              "models": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "baseUrl": {
+                          "type": "string"
+                        },
+                        "authType": {
+                          "type": "string"
+                        },
+                        "family": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string"
+                        },
+                        "maxInputTokens": {
+                          "type": "number"
+                        },
+                        "maxOutputTokens": {
+                          "type": "number"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "requiresThinkingParam": {
+                          "type": "boolean"
+                        },
+                        "priceCategory": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "mid",
+                            "high"
+                          ]
+                        },
+                        "capabilities": {
+                          "type": "object",
+                          "properties": {
+                            "toolCalling": {
+                              "type": [
+                                "boolean",
+                                "number"
+                              ]
+                            },
+                            "imageInput": {
+                              "type": "boolean"
+                            },
+                            "thinking": {
+                              "type": "boolean"
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "baseUrl": {
+                "type": "string"
+              },
+              "authType": {
+                "type": "string",
+                "enum": [
+                  "bearer",
+                  "x-api-key"
+                ]
               },
               "anthropicVersion": {
-                "type": "string",
-                "description": "%byok-copilot.config.endpoints.anthropicVersion.description%"
+                "type": "string"
               }
-            },
-            "required": ["name", "baseUrl", "models"]
+            }
           }
+        }
+      },
+      "models": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "displayName": {
+                  "type": "string"
+                },
+                "baseUrl": {
+                  "type": "string"
+                },
+                "authType": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "maxInputTokens": {
+                  "type": "number"
+                },
+                "maxOutputTokens": {
+                  "type": "number"
+                },
+                "detail": {
+                  "type": "string"
+                },
+                "requiresThinkingParam": {
+                  "type": "boolean"
+                },
+                "priceCategory": {
+                  "type": "string",
+                  "enum": [
+                    "low",
+                    "mid",
+                    "high"
+                  ]
+                },
+                "capabilities": {
+                  "type": "object",
+                  "properties": {
+                    "toolCalling": {
+                      "type": [
+                        "boolean",
+                        "number"
+                      ]
+                    },
+                    "imageInput": {
+                      "type": "boolean"
+                    },
+                    "thinking": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "protocol": {
+                  "type": "string"
+                },
+                "anthropicVersion": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          ]
         },
-        "byok-copilot.maxTokens": {
+        "description": "%byok-copilot.config.endpoints.models.description%"
+      },
+      "protocol": {
+        "type": "string",
+        "enum": [
+          "openai-completions",
+          "openai-responses",
+          "anthropic-messages"
+        ],
+        "description": "%byok-copilot.config.endpoints.protocol.description%"
+      },
+      "anthropicVersion": {
+        "type": "string",
+        "description": "%byok-copilot.config.endpoints.anthropicVersion.description%"
+      }
+    },
+    "required": [
+      "name",
+      "baseUrl"
+    ]
+  }
+},
+  "byok-copilot.maxTokens": {
           "type": "number",
           "default": 0,
           "minimum": 0,

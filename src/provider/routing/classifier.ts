@@ -72,7 +72,7 @@ export function classifyApiRequest(input: {
 }): RequestKind {
 	return classifyRequest({
 		firstText:
-			input.request.messages[0]?.content ??
+			input.request.messages?.[0]?.content ??
 			(input.inputMessages ? getFirstVscodeText(input.inputMessages) : ''),
 		latestUserText:
 			(input.inputMessages ? getLatestVscodeUserText(input.inputMessages) : '') ||
@@ -178,7 +178,11 @@ function getVscodeMessageText(message: vscode.LanguageModelChatRequestMessage): 
 }
 
 function getLatestApiUserText(request: BYOKRequest): string {
-	for (let index = request.messages.length - 1; index >= 0; index -= 1) {
+	const messages = request.messages;
+	if (!messages || messages.length === 0) {
+		return '';
+	}
+	for (let index = messages.length - 1; index >= 0; index -= 1) {
 		const message = request.messages[index];
 		if (message.role === 'user') {
 			return message.content;

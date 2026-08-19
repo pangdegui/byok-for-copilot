@@ -9,8 +9,8 @@ BYOK requires API endpoints to be configured before you can use it in Copilot Ch
 3. Fill in:
    - **Endpoint name** — a friendly name (e.g., `my-provider`)
    - **API URL** — the base URL of your API provider
-   - **Protocol** — OpenAI-compatible or Anthropic-compatible
-   - **Models** — comma-separated model IDs
+   - **Style** — one of the three equal styles: OpenAI Chat, OpenAI Responses, or Anthropic Claude
+   - **Models** — comma-separated model IDs for that style
 
 4. Click on the endpoint and set your **API Key**
 

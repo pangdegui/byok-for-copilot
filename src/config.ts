@@ -142,12 +142,42 @@ function getScopedValue<T>(
 }
 
 // ---- Endpoint management ----
+//
+// Endpoints are organized as a three-tier structure:
+//   Endpoint -> Style -> Model
+//
+// Each endpoint may declare one or more "styles" (the three API protocols are
+// treated as equal peers):
+//   - 'openai-chat'        OpenAI Chat / Completions API
+//   - 'openai-responses'   OpenAI Responses API
+//   - 'anthropic-messages' Anthropic Claude Messages API
+// Models are attached to the style they belong to.
+//
+// The legacy flat format ({ name, baseUrl, models, protocol, anthropicVersion })
+// is still accepted and normalized into the new `styles` structure.
+
+/** The three API styles that an endpoint can expose. */
+export type EndpointStyle = 'openai-chat' | 'openai-responses' | 'anthropic-messages';
+
+/** All supported styles, in a stable order. */
+export const ENDPOINT_STYLES: readonly EndpointStyle[] = [
+	'openai-chat',
+	'openai-responses',
+	'anthropic-messages',
+];
+
+/** Map a legacy protocol enum value to its new style identifier. */
+export function normalizeStyle(style: unknown): EndpointStyle {
+	if (style === 'openai-responses') return 'openai-responses';
+	if (style === 'anthropic-messages') return 'anthropic-messages';
+	return 'openai-chat';
+}
 
 export interface EndpointModelEntry {
 	id: string;
 	baseUrl?: string;
 	authType?: 'bearer' | 'x-api-key';
-	protocol?: 'openai-completions' | 'anthropic-messages';
+	protocol?: EndpointStyle;
 	anthropicVersion?: string;
 	displayName?: string;
 	family?: string;
@@ -165,40 +195,144 @@ export interface EndpointModelEntry {
 	priceCategory?: string;
 }
 
+/** Per-style configuration: the models exposed under a given style. */
+export interface EndpointStyleConfig {
+	models: (string | EndpointModelEntry)[];
+	/** Optional per-style baseUrl override (falls back to the endpoint baseUrl). */
+	baseUrl?: string;
+	authType?: 'bearer' | 'x-api-key';
+	/** Anthropic API version header — only meaningful for 'anthropic-messages'. */
+	anthropicVersion?: string;
+}
+
 export interface EndpointConfig {
 	name: string;
 	baseUrl: string;
-	models: (string | EndpointModelEntry)[];
-	protocol?: 'openai-completions' | 'anthropic-messages';
-	anthropicVersion?: string;
+	/** Three-tier structure: this endpoint exposes zero or more styles. */
+	styles: Partial<Record<EndpointStyle, EndpointStyleConfig>>;
+}
+
+/** Result of resolving a model id within an endpoint to its style + entry. */
+export interface ResolvedStyleModel {
+	style: EndpointStyle;
+	styleConfig: EndpointStyleConfig;
+	modelEntry?: EndpointModelEntry;
 }
 
 /**
  * Get all configured endpoint profiles from settings.
+ * Legacy flat configs are normalized into the new three-tier `styles` shape.
  */
 export function getEndpoints(): EndpointConfig[] {
 	const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
 	const endpoints = config.get<unknown[]>('endpoints', []);
 	if (!Array.isArray(endpoints)) return [];
-	return endpoints.filter(
-		(e): e is EndpointConfig =>
-			typeof e === 'object' && e !== null &&
-			typeof (e as Record<string, unknown>).name === 'string' &&
-			typeof (e as Record<string, unknown>).baseUrl === 'string' &&
-			Array.isArray((e as Record<string, unknown>).models),
-	);
+	const result: EndpointConfig[] = [];
+	for (const raw of endpoints) {
+		const normalized = normalizeEndpointConfig(raw);
+		if (normalized) {
+			result.push(normalized);
+		}
+	}
+	return result;
+}
+
+function normalizeEndpointConfig(raw: unknown): EndpointConfig | undefined {
+	if (typeof raw !== 'object' || raw === null) {
+		return undefined;
+	}
+	const r = raw as Record<string, unknown>;
+	if (typeof r.name !== 'string' || typeof r.baseUrl !== 'string') {
+		return undefined;
+	}
+	const baseUrl = r.baseUrl.trim().replace(/\/+$/, '');
+	const styles: Partial<Record<EndpointStyle, EndpointStyleConfig>> = {};
+
+	// 1) New format: endpoint.styles.<style>.models
+	const rawStyles = r.styles;
+	if (rawStyles && typeof rawStyles === 'object' && !Array.isArray(rawStyles)) {
+		for (const style of ENDPOINT_STYLES) {
+			const sc = (rawStyles as Record<string, unknown>)[style];
+			if (!sc || typeof sc !== 'object') {
+				continue;
+			}
+			const scObj = sc as Record<string, unknown>;
+			if (!Array.isArray(scObj.models)) {
+				continue;
+			}
+			styles[style] = {
+				models: scObj.models,
+				baseUrl:
+					typeof scObj.baseUrl === 'string'
+						? scObj.baseUrl.trim().replace(/\/+$/, '')
+						: undefined,
+				authType: scObj.authType === 'x-api-key' ? 'x-api-key' : undefined,
+				anthropicVersion:
+					typeof scObj.anthropicVersion === 'string' ? scObj.anthropicVersion : undefined,
+			};
+		}
+	}
+
+	// 2) Legacy flat format: top-level models + protocol + anthropicVersion
+	if (Array.isArray(r.models) && r.models.length > 0) {
+		const style = normalizeStyle(r.protocol);
+		styles[style] = {
+			models: r.models,
+			anthropicVersion:
+				typeof r.anthropicVersion === 'string' ? r.anthropicVersion : undefined,
+		};
+	}
+
+	if (Object.keys(styles).length === 0) {
+		styles['openai-chat'] = { models: [] };
+	}
+
+	return { name: r.name, baseUrl, styles };
+}
+
+function endpointHasModel(ep: EndpointConfig, modelId: string): boolean {
+	return getStylesForModel(ep, modelId).length > 0;
+}
+
+/**
+ * List the styles within an endpoint that mount the given model ID.
+ *
+ * A model is only allowed to mount on a single style, so this normally returns
+ * at most one style. (Identical model *configuration* objects across different
+ * styles are allowed, but each model ID belongs to exactly one style.)
+ */
+export function getStylesForModel(ep: EndpointConfig, modelId: string): EndpointStyle[] {
+	return ENDPOINT_STYLES.filter((s) => {
+		const cfg = ep.styles[s];
+		return !!cfg && (cfg.models ?? []).some((m) => (typeof m === 'string' ? m : m.id) === modelId);
+	});
+}
+
+/** Flatten all model entries (strings or objects) across every style of an endpoint. */
+export function getAllEndpointModels(ep: EndpointConfig): (string | EndpointModelEntry)[] {
+	const out: (string | EndpointModelEntry)[] = [];
+	for (const style of ENDPOINT_STYLES) {
+		const cfg = ep.styles[style];
+		if (cfg) {
+			out.push(...cfg.models);
+		}
+	}
+	return out;
+}
+
+/** All model ids exposed by an endpoint (across all styles). */
+export function getEndpointModelIds(ep: EndpointConfig): string[] {
+	return getAllEndpointModels(ep).map((m) => (typeof m === 'string' ? m : m.id));
 }
 
 /**
  * Find the endpoint config for a given model ID.
- * Searches user endpoints first.
+ * Searches user endpoints first (across all styles).
  * Returns the endpoint object or undefined.
  */
 export function getEndpointForModel(modelId: string): EndpointConfig | undefined {
 	const userEndpoints = getEndpoints();
-	return userEndpoints.find((e) =>
-		e.models.some((m) => (typeof m === 'string' ? m : m.id) === modelId),
-	);
+	return userEndpoints.find((e) => endpointHasModel(e, modelId));
 }
 
 /**
@@ -210,27 +344,63 @@ export function getEndpointByName(name: string): EndpointConfig | undefined {
 }
 
 /**
- * Find the per-model baseUrl override for a model within an endpoint.
- * Returns undefined if the model doesn't have its own baseUrl.
+ * Resolve a model id within an endpoint to its owning style, style config and
+ * optional per-model entry.
  */
-export function getModelBaseUrl(endpointName: string, modelId: string): string | undefined {
-	const entry = getEndpointModelDef(endpointName, modelId);
-	return entry?.baseUrl ? entry.baseUrl.replace(/\/+$/, '') : undefined;
+export function getResolvedStyleModel(
+	endpointName: string,
+	modelId: string,
+): ResolvedStyleModel | undefined {
+	const ep = getEndpointByName(endpointName);
+	if (!ep) {
+		return undefined;
+	}
+	for (const style of ENDPOINT_STYLES) {
+		const cfg = ep.styles[style];
+		if (!cfg) {
+			continue;
+		}
+		const entry = (cfg.models ?? []).find(
+			(m) => (typeof m === 'string' ? m : m.id) === modelId,
+		);
+		if (entry) {
+			return {
+				style,
+				styleConfig: cfg,
+				modelEntry: typeof entry === 'object' ? entry : undefined,
+			};
+		}
+	}
+	return undefined;
 }
 
 /**
- * Find the full model entry object from an endpoint config by model ID.
+ * Find which style a model belongs to within an endpoint.
+ * Returns undefined if the model isn't attached to the endpoint.
+ */
+export function getStyleForModel(endpointName: string, modelId: string): EndpointStyle | undefined {
+	return getResolvedStyleModel(endpointName, modelId)?.style;
+}
+
+/**
+ * Find the per-model / per-style baseUrl override for a model within an endpoint.
+ * Precedence: per-model baseUrl > per-style baseUrl.
+ */
+export function getModelBaseUrl(endpointName: string, modelId: string): string | undefined {
+	const resolved = getResolvedStyleModel(endpointName, modelId);
+	if (!resolved) {
+		return undefined;
+	}
+	return resolved.modelEntry?.baseUrl?.replace(/\/+$/, '') || resolved.styleConfig.baseUrl;
+}
+
+/**
+ * Find the full model entry object from an endpoint config by model ID
+ * (searching across all styles).
  */
 export function getEndpointModelDef(
 	endpointName: string,
 	modelId: string,
 ): EndpointModelEntry | undefined {
-	const ep = getEndpointByName(endpointName);
-	if (!ep) return undefined;
-	for (const m of ep.models) {
-		if (typeof m === 'object' && m.id === modelId) {
-			return m;
-		}
-	}
-	return undefined;
+	return getResolvedStyleModel(endpointName, modelId)?.modelEntry;
 }

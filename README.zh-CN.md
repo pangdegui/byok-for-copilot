@@ -46,28 +46,40 @@ npx vsce package --out dist/
 3. 填写：
    - **名称** — 自定义标识（如 `my-provider`）
    - **API URL** — API 基础地址
-   - **协议** — `openai-completions` 或 `anthropic-messages`
-   - **模型** — 逗号分隔的模型 ID 列表
+   - **风格** — 三种彼此平等的风格之一：`openai-chat`、`openai-responses` 或 `anthropic-messages`
+   - **模型** — 该风格下的逗号分隔模型 ID 列表
 4. 点击端点条目，设置 **API Key**
 
 #### 通过设置
+
+端点为 **端点 → 风格 → 模型** 三级结构。同一端点可同时暴露多种风格（三种风格彼此平等），模型挂在对应风格下：
 
 ```json
 "byok-copilot.endpoints": [
   {
     "name": "my-openai",
     "baseUrl": "https://api.openai.com/v1",
-    "protocol": "openai-completions",
-    "models": ["gpt-4o", "gpt-4-turbo"]
+    "styles": {
+      "openai-chat": { "models": ["gpt-4o", "gpt-4-turbo"] },
+      "openai-responses": { "models": ["gpt-4o"] }
+    }
   },
   {
     "name": "my-anthropic",
     "baseUrl": "https://api.anthropic.com",
-    "protocol": "anthropic-messages",
-    "models": ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"]
+    "styles": {
+      "anthropic-messages": {
+        "models": ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"],
+        "anthropicVersion": "2023-06-01"
+      }
+    }
   }
 ]
 ```
+
+> 旧版扁平格式（`models` + `protocol` + 可选 `anthropicVersion`）仍然兼容，会自动归一化为 `styles` 结构。
+
+> 📌 同一端点下，一个模型 ID 只允许挂载在**一个**风格上。不同风格之间允许使用相同的模型*配置*值，但每个模型 ID 只属于一个风格。
 
 ### 选择模型
 
@@ -77,9 +89,11 @@ npx vsce package --out dist/
 
 > 💡 如果模型未显示，运行 `Developer: Manage Language Models` 检查 BYOK 模型是否被隐藏。
 
-## 支持的协议
+## 支持的风格
 
-### OpenAI 兼容协议 (`openai-completions`)
+三种 API 风格彼此平等，可在同一端点共存。
+
+### OpenAI Chat 风格 (`openai-chat`)
 
 支持所有提供 `/chat/completions` 接口的 API 提供商：
 
@@ -87,7 +101,13 @@ npx vsce package --out dist/
 - DeepSeek
 - 任意兼容的第三方代理或自部署服务
 
-### Anthropic Messages 协议 (`anthropic-messages`)
+### OpenAI Responses 风格 (`openai-responses`)
+
+支持 OpenAI Responses API（`/responses` 接口）：
+
+- OpenAI GPT-5 / 兼容 Responses 的模型与服务
+
+### Anthropic Messages 风格 (`anthropic-messages`)
 
 支持 Anthropic Messages API：
 

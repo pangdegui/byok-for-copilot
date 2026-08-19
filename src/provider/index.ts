@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { AuthManager } from '../auth';
-import { getEndpoints, getStabilizeToolListEnabled } from '../config';
+import { getEndpoints, getStabilizeToolListEnabled, ENDPOINT_STYLES, getEndpointModelIds, type EndpointStyle } from '../config';
 import { MODEL_TEMPLATES } from '../consts';
 import { t } from '../i18n';
 import { logger } from '../logger';
@@ -143,7 +143,7 @@ export class BYOKChatProvider implements vscode.LanguageModelChatProvider {
 				endpoints.map((e) => ({
 					label: e.name,
 					description: e.baseUrl,
-					detail: `模型: ${e.models.join(', ')}`,
+					detail: `模型: ${getEndpointModelIds(e).join(', ')}`,
 				})),
 				{ placeHolder: '选择要设置 API Key 的端点' },
 			);
@@ -180,7 +180,7 @@ export class BYOKChatProvider implements vscode.LanguageModelChatProvider {
 				endpoints.map((e) => ({
 					label: e.name,
 					description: e.baseUrl,
-					detail: `模型: ${e.models.join(', ')}`,
+					detail: `模型: ${getEndpointModelIds(e).join(', ')}`,
 				})),
 				{ placeHolder: '选择要删除 API Key 的端点' },
 			);
@@ -229,68 +229,77 @@ export class BYOKChatProvider implements vscode.LanguageModelChatProvider {
 		};
 
 		for (const ep of allEndpoints) {
-			logger.info(`endpoint "${ep.name}": models=${JSON.stringify(ep.models)}`);
+			logger.info(`endpoint "${ep.name}": models=${JSON.stringify(getEndpointModelIds(ep))}`);
 			const epHasKey = await this.authManager.getApiKeyForEndpoint(ep.name);
 
-			for (const modelEntry of ep.models) {
-				let baseModelId: string;
-				let displayName: string;
-				let modelDef: Record<string, unknown>;
-
-				if (typeof modelEntry === 'string') {
-					baseModelId = modelEntry;
-					const found = MODEL_TEMPLATES.find((m) => m.id === baseModelId);
-					if (found) {
-						modelDef = found as unknown as Record<string, unknown>;
-						displayName = modelDef.name as string;
-					} else {
-						// Model not in built-in templates — use default template with the custom model ID
-						logger.info(`endpoint model "${baseModelId}" is custom, using default template`);
-						modelDef = {
-							...template,
-							id: baseModelId,
-							name: baseModelId,
-							detail: `Custom model: ${baseModelId}`,
-						};
-						displayName = baseModelId;
-					}
-				} else if (typeof modelEntry === 'object' && modelEntry.id) {
-					baseModelId = modelEntry.id;
-					displayName = modelEntry.displayName || modelEntry.id;
-					const builtin = MODEL_TEMPLATES.find((m) => m.id === baseModelId);
-					const base = builtin || template;
-					modelDef = {
-						id: baseModelId,
-						name: displayName,
-						family: modelEntry.family ?? base.family,
-						version: modelEntry.version ?? base.version,
-						detail: modelEntry.detail ?? displayName,
-						maxInputTokens: modelEntry.maxInputTokens ?? base.maxInputTokens,
-						maxOutputTokens: modelEntry.maxOutputTokens ?? base.maxOutputTokens,
-						capabilities: modelEntry.capabilities ?? base.capabilities,
-						requiresThinkingParam:
-							modelEntry.requiresThinkingParam ?? base.requiresThinkingParam,
-						pricing: modelEntry.pricing ?? base.pricing,
-						priceCategory: modelEntry.priceCategory ?? base.priceCategory,
-					};
-				} else {
+			for (const style of ENDPOINT_STYLES) {
+				const styleConfig = ep.styles[style];
+				if (!styleConfig) {
 					continue;
 				}
+				const styleLabel = styleLabelText(style);
+				const multiStyle = Object.keys(ep.styles).length > 1;
 
-				logger.info(
-					`adding endpoint model: ${baseModelId}@${ep.name}, hasKey=${!!epHasKey}`,
-				);
+				for (const modelEntry of styleConfig.models) {
+					let baseModelId: string;
+					let displayName: string;
+					let modelDef: Record<string, unknown>;
 
-				const modelId = `${baseModelId}@${ep.name}`;
-				const modelName = `${displayName} (${ep.name})`;
+					if (typeof modelEntry === 'string') {
+						baseModelId = modelEntry;
+						const found = MODEL_TEMPLATES.find((m) => m.id === baseModelId);
+						if (found) {
+							modelDef = found as unknown as Record<string, unknown>;
+							displayName = modelDef.name as string;
+						} else {
+							// Model not in built-in templates — use default template with the custom model ID
+							logger.info(`endpoint model "${baseModelId}" is custom, using default template`);
+							modelDef = {
+								...template,
+								id: baseModelId,
+								name: baseModelId,
+								detail: `Custom model: ${baseModelId}`,
+							};
+							displayName = baseModelId;
+						}
+					} else if (typeof modelEntry === 'object' && modelEntry.id) {
+						baseModelId = modelEntry.id;
+						displayName = modelEntry.displayName || modelEntry.id;
+						const builtin = MODEL_TEMPLATES.find((m) => m.id === baseModelId);
+						const base = builtin || template;
+						modelDef = {
+							id: baseModelId,
+							name: displayName,
+							family: modelEntry.family ?? base.family,
+							version: modelEntry.version ?? base.version,
+							detail: modelEntry.detail ?? displayName,
+							maxInputTokens: modelEntry.maxInputTokens ?? base.maxInputTokens,
+							maxOutputTokens: modelEntry.maxOutputTokens ?? base.maxOutputTokens,
+							capabilities: modelEntry.capabilities ?? base.capabilities,
+							requiresThinkingParam:
+								modelEntry.requiresThinkingParam ?? base.requiresThinkingParam,
+							pricing: modelEntry.pricing ?? base.pricing,
+							priceCategory: modelEntry.priceCategory ?? base.priceCategory,
+						};
+					} else {
+						continue;
+					}
 
-				result.push(
-					toChatInfo(
-						{ ...modelDef, id: modelId, name: modelName } as Parameters<typeof toChatInfo>[0],
-						!!epHasKey,
-						pricingCurrency,
-					),
-				);
+					logger.info(
+						`adding endpoint model: ${baseModelId}@${ep.name}, hasKey=${!!epHasKey} (style: ${styleLabel})`,
+					);
+
+					const modelId = `${baseModelId}@${ep.name}`;
+					const modelName = `${displayName} (${ep.name}${multiStyle ? ` · ${styleLabel}` : ''})`;
+
+					result.push(
+						toChatInfo(
+							{ ...modelDef, id: modelId, name: modelName } as Parameters<typeof toChatInfo>[0],
+							!!epHasKey,
+							pricingCurrency,
+						),
+					);
+				}
 			}
 		}
 
@@ -364,6 +373,17 @@ export class BYOKChatProvider implements vscode.LanguageModelChatProvider {
 		_token: vscode.CancellationToken,
 	): Promise<number> {
 		return estimateTokenCount(text, this.charsPerToken);
+	}
+}
+
+function styleLabelText(style: EndpointStyle): string {
+	switch (style) {
+		case 'openai-responses':
+			return 'OpenAI Responses';
+		case 'anthropic-messages':
+			return 'Claude';
+		default:
+			return 'OpenAI Chat';
 	}
 }
 
