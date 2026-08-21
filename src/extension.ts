@@ -1,1 +1,1 @@
-export { activate, deactivate } from './runtime';
+export { activate, deactivate } from './copilot/runtime';

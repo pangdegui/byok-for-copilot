@@ -14,8 +14,10 @@
   "byok-copilot.command.deleteEndpoint": "BYOK: 删除端点",
   "byok-copilot.command.addModelToEndpoint": "BYOK: 添加模型",
   "byok-copilot.command.deleteModelFromEndpoint": "BYOK: 删除模型",
+  "byok-copilot.command.configureStyle": "BYOK: 配置风格",
   "byok-copilot.command.configureModel": "BYOK: 配置模型",
   "byok-copilot.command.openStatsPanel": "BYOK: 打开用量统计",
+  "byok-copilot.command.openHealthPanel": "BYOK: 打开连接健康",
   "byok-copilot.command.refreshUsageStats": "BYOK: 刷新用量统计",
   "byok-copilot.views.endpointsSidebar.name": "端点",
   "byok-copilot.views.statsSidebar.name": "用量统计",
@@ -29,7 +31,9 @@
   "byok-copilot.walkthrough.advancedSettings.description": "可以在插件设置中自定义提供方与模型名称、自定义视觉代理、开启实验性设置等。\n[打开设置](command:byok-copilot.openSettings)",
   "byok-copilot.config.title": "BYOK 助手",
   "byok-copilot.config.maxTokens.description": "每次请求的最大输出 Token 数，设为 0 则不限制，可用于控制成本。",
-  "byok-copilot.config.experimental.stabilizeToolList.description": "**实验性功能**：通过预先激活可用的工具来提升上下文缓存命中率。\n- 当已启用工具列表跨轮次变化时，这可能提高上下文缓存命中率；\n- 请求中将包含更多函数工具定义，input tokens 可能增加，虽然缓存命中的 input tokens 单价更低，但仍会计入用量；\n- 此设置可能会在当前 Copilot 对话历史中加入内部预检工具调用。在同一对话中切换到其他模型时，部分模型提供方可能无法正确重放这段历史；如果切换模型后请求异常，请新建对话后重试。\n\n 通过 [配置工具](command:workbench.action.chat.configureTools) **查看和管理**工具列表：\n\n- 64 个或更少已启用工具时通常无需开启，除非工具列表仍在跨轮次变化；\n- 超过 128 个已启用工具时不建议开启：多数 API 单次请求最多支持 128 个 functions。考虑禁用部分不常用工具。",
+  "byok-copilot.config.proxy.description": "请求的代理策略。`mode` 可选 `system`（跟随环境/系统代理）、`direct`（直连，绕过代理）或 `proxy`（固定走指定 `url` 代理）。模型或风格级别设置时覆盖端点级别（模型 > 风格 > 端点）。",
+  "byok-copilot.config.proxy.model.description": "模型级代理覆盖，优先级高于风格与端点级。",
+  "byok-copilot.config.experimental.stabilizeToolList.description": "**实验性功能**：压缩首轮 `activate_*` 虚拟工具集，避免模型需要在大量激活工具中做无谓推理。\n- Copilot Chat 每轮会注入一批 `activate_<agent|skill>` 虚拟激活工具。开启后，BYOK 会预先激活尚未调用的激活工具并提前返回，后续轮次就不再重复注入全量激活工具——节省 prompt 上下文。\n- 普通工具完全不受影响：始终透传给后端，其调用与执行仍由 Copilot 自身的 agent loop 负责。\n- 对所有模型生效（所有模型均接受工具集）；若工具集过大，请使用此开关而非按模型声明裁剪。\n- 可能向当前对话历史加入内部预检激活调用。同一对话中切换到其他模型时，部分模型提供方可能无法正确重放这段历史；如切换后请求异常请新建对话重试。",
   "byok-copilot.config.debugMode.description": "控制 BYOK 写入自身日志的诊断信息量。无论此设置如何，token 用量始终在本地记录（用于内置统计与 token 计数校准）。\n\n- **基本** \u2014 仅记录 token 用量，不输出诊断日志或请求 dump。\n- **元数据** \u2014 隐私安全的诊断元数据（请求哈希、前缀重合度、工具定义变更）。不含提示词原文，可安全附在公开 issue 中反馈问题。使用 [`BYOK: 显示日志`](command:byok-copilot.showLogs) 查看。\n- **详细** \u2014 将完整请求体写入磁盘，供本地调试。**警告：包含敏感的提示词内容。** 使用 [`BYOK: 打开请求 Dump 目录`](command:byok-copilot.openRequestDumpsFolder) 浏览。\n\n**隐私说明**：BYOK 不会向微软上传任何数据。所有 API 请求只发往你自己配置的端点，用量统计仅保存在本地。",
   "byok-copilot.config.debugMode.minimal.label": "基本",
   "byok-copilot.config.debugMode.minimal.description": "仅上报 token 用量，不输出诊断日志或 dump。",
@@ -52,5 +56,6 @@
   "byok-copilot.config.endpoints.styles.anthropicMessages.description": "Anthropic Claude Messages 风格下的模型。",
   "byok-copilot.config.endpoints.protocol.description": "旧版端点风格（'openai-completions'、'openai-responses' 或 'anthropic-messages'）。推荐使用 `styles` 对象在同一端点配置多种风格。",
   "byok-copilot.config.endpoints.anthropicVersion.description": "Anthropic API 版本头信息（例如 '2023-06-01'）。仅在 'anthropic-messages' 风格下使用。",
+  "byok-copilot.config.endpoints.styles.model.visionPrompt.description": "模型级视觉描述提示词覆盖。优先于全局 `byok-copilot.visionPrompt` 作用于该模型；留空则继承全局设置。",
   "byok-copilot.config.privacy.reportUsageToChat.description": "是否把每次请求的 token 用量发送给本地 Copilot Chat 界面（进程内通信，用于在聊天中显示 token 数）。**默认开启**。BYOK 不会向微软上传用量数据——用量始终在本地记录，用于内置统计。关闭后用量数据将完全保存在本地（聊天界面不再显示 token 数）。"
 }

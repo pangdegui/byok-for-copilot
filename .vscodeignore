@@ -4,6 +4,7 @@ src/**
 scripts/**
 test/**
 node_modules/**
+!node_modules/undici/**
 out/test/**
 **/*.map
 **/*.ts
