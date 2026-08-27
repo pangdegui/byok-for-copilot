@@ -28,6 +28,9 @@ import { pickTierTable, type PriceTable } from '../copilot/pricing/tiered';
 export interface PreparedChatRequest {
 	client: ReturnType<typeof createClient>;
 	request: Record<string, unknown>;
+	/** Configured API style (openai-chat / openai-responses / anthropic-messages).
+	 * Drives cache-format interpretation for the reported usage. */
+	style: EndpointStyle;
 	/** Extension globalStorageUri, used to locate the request-dumps directory. */
 	globalStorageUri: vscode.Uri;
 	/** VS Code model id, e.g. `deepseek-v4-flash@opencode`. */
@@ -195,6 +198,7 @@ export async function prepareChatRequest({
 		maxTokens,
 		inputMessages: messages,
 		resolvedMessages,
+		style,
 		visionModelId: visionResolution.visionModelId,
 		visionProxySource: visionResolution.visionProxySource,
 		visionStats: visionResolution.stats,
@@ -203,6 +207,7 @@ export async function prepareChatRequest({
 	return {
 		client,
 		request,
+		style,
 		globalStorageUri,
 		vscodeModelId: modelInfo.id,
 		apiModelId: getApiModelId(baseModelId),

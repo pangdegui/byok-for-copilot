@@ -21,6 +21,7 @@ import {
 } from '../capability/replay';
 import { reasoningStateCache } from '../backend/responses';
 import { estimateCost, formatCost, type PriceTable } from '../copilot/pricing/tiered';
+import type { EndpointStyle } from '../domain/profile-config';
 import type { PreparedChatRequest } from './request';
 
 interface ResponseStreamState {
@@ -152,15 +153,16 @@ export function streamChatCompletion({
 					// (resolved in prepareChatRequest via pickTierTable).
 					const estimate =
 						prepared.pricingTable !== undefined
-							? estimateCost(usage, prepared.pricingTable, state.toolCalls.length)
+							? estimateCost(usage, prepared.pricingTable, state.toolCalls.length, prepared.style)
 							: undefined;
 					recordUsageEvent(prepared.vscodeModelId, prepared.apiModelId, usage, charsPerToken, {
 						toolCallCount: state.toolCalls.length,
 						cost: estimate?.priced ? estimate.total : undefined,
+						style: prepared.style,
 					});
 					logCostEstimate(prepared, estimate);
 					if (getReportUsageToChatEnabled()) {
-						reportCopilotContextUsage(progress, usage, prepared.requestKind);
+						reportCopilotContextUsage(progress, usage, prepared.requestKind, prepared.style);
 					}
 				},
 
@@ -378,8 +380,9 @@ function reportCopilotContextUsage(
 	progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 	usage: BYOKUsage,
 	requestKind: RequestKind,
+	style?: EndpointStyle,
 ): void {
-	const normalized = normalizeUsage(usage);
+	const normalized = normalizeUsage(usage, style);
 	const data = {
 		prompt_tokens: usage.prompt_tokens,
 		completion_tokens: usage.completion_tokens,

@@ -6,6 +6,7 @@ import { logger } from '../../logger';
 import type { BYOKMessage, BYOKRequest, BYOKTool, BYOKUsage } from '../../types';
 import { normalizeResponsesInput } from '../../backend/responses/debug-input';
 import { formatCacheLog, formatCacheRate, normalizeUsage } from '../stats/usage';
+import type { EndpointStyle } from '../../domain/profile-config';
 import {
 	classifyApiRequest,
 	formatModelFields,
@@ -175,6 +176,8 @@ export interface BeginCacheDiagnosticsOptions {
 	maxTokens: number | undefined;
 	inputMessages: readonly vscode.LanguageModelChatRequestMessage[];
 	resolvedMessages: readonly vscode.LanguageModelChatRequestMessage[];
+	/** Configured endpoint style — drives cache-format interpretation for usage logs. */
+	style?: EndpointStyle;
 	visionModelId?: string;
 	visionProxySource?: VisionProxySource;
 	visionStats?: VisionPipelineStats;
@@ -321,6 +324,8 @@ interface UsageLogContext {
 	vscodeModelId: string;
 	apiModelId: string;
 	requestKind: RequestKind;
+	/** Configured endpoint style, used to interpret the reported cache format. */
+	style?: EndpointStyle;
 }
 
 class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
@@ -347,6 +352,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 				vscodeModelId: options.vscodeModelId,
 				apiModelId: options.request.model,
 				requestKind,
+				style: options.style,
 			});
 		}
 
@@ -545,6 +551,7 @@ class DefaultCacheDiagnosticsRecorder implements CacheDiagnosticsRecorder {
 				vscodeModelId: options.vscodeModelId,
 				apiModelId: options.request.model,
 				requestKind,
+				style: options.style,
 			},
 			cacheTraceComparison ?? traceKeyChangeComparison ?? scopedTraceKeyChangeComparison,
 			cacheTraceComparison
@@ -623,7 +630,7 @@ class ActiveCacheDiagnosticsRun implements CacheDiagnosticsRun {
 	onUsage(usage: BYOKUsage, charsPerToken: number): void {
 		logUsage(usage, charsPerToken, this.usageLogContext, this.requestId);
 		if (this.resultComparison) {
-			const hitRate = getCacheHitRate(usage);
+			const hitRate = getCacheHitRate(usage, this.usageLogContext.style);
 			logger.info(
 				formatRequestLogLine(
 					this.snapshot.requestKind,
@@ -804,7 +811,7 @@ function logUsage(
 	context: UsageLogContext,
 	requestId?: number,
 ): void {
-	const normalized = normalizeUsage(usage);
+	const normalized = normalizeUsage(usage, context.style);
 	const cacheLabel = formatCacheLog(normalized.cache, normalized.cacheRate);
 	const invalidLabel = normalized.valid ? '' : ' | invalid=nan (skipped from stats)';
 	const sourceLabel =
@@ -829,8 +836,8 @@ function formatTokenCount(value: number): string {
 	return Number.isFinite(value) ? String(value) : 'n/a';
 }
 
-function getCacheHitRate(usage: BYOKUsage): string {
-	return formatCacheRate(normalizeUsage(usage).cacheRate);
+function getCacheHitRate(usage: BYOKUsage, style?: EndpointStyle): string {
+	return formatCacheRate(normalizeUsage(usage, style).cacheRate);
 }
 
 function summarizeVisionResolution(

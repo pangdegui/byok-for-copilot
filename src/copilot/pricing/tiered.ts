@@ -1,4 +1,5 @@
 import type { BYOKUsage, PriceTable, TieredPricing } from '../../types';
+import type { EndpointStyle } from '../../domain/profile-config';
 
 export type { PriceTable, TieredPricing };
 import { normalizeUsage } from '../stats/usage';
@@ -97,8 +98,9 @@ export function estimateCost(
 	usage: BYOKUsage,
 	table: PriceTable,
 	toolCallCount = 0,
+	style?: EndpointStyle,
 ): CostEstimate {
-	const normalized = normalizeUsage(usage);
+	const normalized = normalizeUsage(usage, style);
 
 	const cacheRead = Math.max(0, normalized.cache.hit);
 	const cacheWrite = Math.max(0, normalized.cacheWriteTokens);

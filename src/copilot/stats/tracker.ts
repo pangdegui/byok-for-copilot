@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import type { BYOKUsage } from '../../types';
+import type { EndpointStyle } from '../../domain/profile-config';
 import { normalizeUsage } from './usage';
 import { UsageStatsStore, type ModelAggregate, type StatsSnapshot } from './store';
 
@@ -30,9 +31,9 @@ export class UsageTracker {
 		apiModelId: string,
 		usage: BYOKUsage,
 		charsPerToken: number,
-		extra?: { toolCallCount?: number; cost?: number },
+		extra?: { toolCallCount?: number; cost?: number; style?: EndpointStyle },
 	): void {
-		const normalized = normalizeUsage(usage);
+		const normalized = normalizeUsage(usage, extra?.style);
 		if (!normalized.valid) {
 			// Skip invalid rows entirely (still surfaced in per-request logs).
 			return;
@@ -93,7 +94,7 @@ export function recordUsageEvent(
 	apiModelId: string,
 	usage: BYOKUsage,
 	charsPerToken: number,
-	extra?: { toolCallCount?: number; cost?: number },
+	extra?: { toolCallCount?: number; cost?: number; style?: EndpointStyle },
 ): void {
 	instance?.record(vscodeModelId, apiModelId, usage, charsPerToken, extra);
 }

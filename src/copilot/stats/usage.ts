@@ -1,4 +1,5 @@
 import type { BYOKUsage } from '../../types';
+import type { EndpointStyle } from '../../domain/profile-config';
 
 /**
  * Normalized usage — every field is guaranteed to be a finite, non-negative
@@ -53,8 +54,21 @@ function firstFinite(values: readonly unknown[]): number | undefined {
  *  - flat:            prompt_cache_hit_tokens / prompt_cache_miss_tokens (DeepSeek, OpenAI-compatible)
  *  - openai-official: prompt_tokens_details.cached_tokens (hit = cached, miss = prompt - cached)
  *  - anthropic:       cache_read_input_tokens (hit) / cache_creation_input_tokens (miss)
+ *
+ * The cache format is decided by the **configured endpoint style**, not by
+ * sniffing the response fields. Aggregation gateways (e.g. commandcode.ai)
+ * echo Anthropic-style cache fields as 0-valued placeholders even for
+ * openai-chat traffic — auto-detection would pick the wrong format.
+ *
+ *   - style === 'anthropic-messages' → only read Anthropic cache fields
+ *   - style === 'openai-chat' | 'openai-responses' → read flat / official fields
+ *   - style === undefined → legacy auto-detect fallback (used where the style
+ *     is not available, e.g. some debug paths)
  */
-export function normalizeUsage(usage: BYOKUsage): NormalizedUsage {
+export function normalizeUsage(
+	usage: BYOKUsage,
+	style?: EndpointStyle,
+): NormalizedUsage {
 	const promptTokens = firstFinite([usage.prompt_tokens]) ?? 0;
 	const completionTokens = firstFinite([usage.completion_tokens]) ?? 0;
 	const totalTokens = firstFinite([usage.total_tokens]) ?? promptTokens + completionTokens;
@@ -76,7 +90,7 @@ export function normalizeUsage(usage: BYOKUsage): NormalizedUsage {
 		};
 	}
 
-	// ---- Resolve cache numbers across the three formats ----
+	// ---- Read the raw cache fields (all formats) ----
 	const flatHit = firstFinite([usage.prompt_cache_hit_tokens]);
 	const flatMiss = firstFinite([usage.prompt_cache_miss_tokens]);
 
@@ -90,23 +104,51 @@ export function normalizeUsage(usage: BYOKUsage): NormalizedUsage {
 	let reported = false;
 	let source: NormalizedUsage['cacheSource'] = 'none';
 
-	if (flatHit !== undefined || flatMiss !== undefined) {
-		// DeepSeek / OpenAI-compatible flat fields take priority.
-		hit = flatHit ?? 0;
-		miss = flatMiss ?? 0;
-		reported = flatHit !== undefined || flatMiss !== undefined;
-		source = 'flat';
-	} else if (anthropicHit !== undefined || anthropicMiss !== undefined) {
-		hit = anthropicHit ?? 0;
-		miss = anthropicMiss ?? 0;
-		reported = anthropicHit !== undefined || anthropicMiss !== undefined;
-		source = 'anthropic';
-	} else if (officialCached !== undefined) {
-		// OpenAI official: only cached_tokens is provided; miss = prompt - cached.
-		hit = officialCached;
-		miss = Math.max(0, promptTokens - officialCached);
-		reported = true;
-		source = 'openai-official';
+	// ---- Decide the cache source by configured style ----
+	if (style === 'anthropic-messages') {
+		// Claude Messages format: read/write cache tokens are the only signals.
+		if (anthropicHit !== undefined || anthropicMiss !== undefined) {
+			hit = anthropicHit ?? 0;
+			miss = anthropicMiss ?? 0;
+			reported = true;
+			source = 'anthropic';
+		}
+	} else if (style === 'openai-chat' || style === 'openai-responses') {
+		// OpenAI-compatible: flat (DeepSeek) first, then official cached_tokens.
+		if (flatHit !== undefined || flatMiss !== undefined) {
+			hit = flatHit ?? 0;
+			miss = flatMiss ?? 0;
+			reported = true;
+			source = 'flat';
+		} else if (officialCached !== undefined) {
+			hit = officialCached;
+			miss = Math.max(0, promptTokens - officialCached);
+			reported = true;
+			source = 'openai-official';
+		}
+	} else {
+		// No style context (legacy auto-detect): flat > anthropic > official.
+		// Only treat Anthropic fields as a valid signal when non-zero, so
+		// 0-valued placeholders from OpenAI gateways do not shadow the real
+		// numbers in `prompt_tokens_details.cached_tokens`.
+		const anthropicHitValid = anthropicHit !== undefined && anthropicHit > 0;
+		const anthropicMissValid = anthropicMiss !== undefined && anthropicMiss > 0;
+		if (flatHit !== undefined || flatMiss !== undefined) {
+			hit = flatHit ?? 0;
+			miss = flatMiss ?? 0;
+			reported = true;
+			source = 'flat';
+		} else if (anthropicHitValid || anthropicMissValid) {
+			hit = anthropicHit ?? 0;
+			miss = anthropicMiss ?? 0;
+			reported = true;
+			source = 'anthropic';
+		} else if (officialCached !== undefined) {
+			hit = officialCached;
+			miss = Math.max(0, promptTokens - officialCached);
+			reported = true;
+			source = 'openai-official';
+		}
 	}
 
 	const cacheTotal = hit + miss;
@@ -119,7 +161,7 @@ export function normalizeUsage(usage: BYOKUsage): NormalizedUsage {
 		completionTokens,
 		totalTokens,
 		cache: { reported, hit, miss },
-		cacheWriteTokens: anthropicHit !== undefined || anthropicMiss !== undefined ? anthropicMiss ?? 0 : 0,
+		cacheWriteTokens: source === 'anthropic' ? (anthropicMiss ?? 0) : 0,
 		cacheRate,
 		cacheSource: source,
 	};

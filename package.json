@@ -3,7 +3,7 @@
   "displayName": "BYOK for Copilot Chat",
   "description": "Bring your own key — use any OpenAI-compatible LLM in Copilot Chat. Vision proxy, thinking mode, agent tools.",
   "icon": "resources/icon.png",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "publisher": "open-tools",
   "license": "MIT",
   "repository": {
